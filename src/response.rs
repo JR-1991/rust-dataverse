@@ -2,12 +2,16 @@ use atty::Stream;
 use colored::Colorize;
 use colored_json::prelude::*;
 
-// We distinguish success and error responses with this enum
-// Once the response is parsed, we can check if it's an error or not
-// and act accordingly
+/// Represents the status of a response from the Dataverse API.
+///
+/// We distinguish success and error responses with this enum.
+/// Once the response is parsed, we can check if it's an error or not
+/// and act accordingly.
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum Status {
+    /// Indicates a successful response
     OK,
+    /// Indicates an error response
     ERROR,
 }
 
@@ -21,6 +25,7 @@ impl PartialEq for Status {
 }
 
 impl Status {
+    /// Returns the string representation of the status
     pub fn as_str(&self) -> &str {
         match self {
             Status::OK => "OK",
@@ -28,6 +33,7 @@ impl Status {
         }
     }
 
+    /// Returns true if the status is OK
     pub fn is_ok(&self) -> bool {
         match self {
             Status::OK => true,
@@ -35,6 +41,7 @@ impl Status {
         }
     }
 
+    /// Returns true if the status is ERROR
     pub fn is_err(&self) -> bool {
         match self {
             Status::OK => false,
@@ -43,34 +50,66 @@ impl Status {
     }
 }
 
-// This struct acts as a wrapper for the response and
-// models the response we expect from Dataverse
+/// A wrapper struct that models the response expected from Dataverse.
+///
+/// This struct contains the response status, optional data payload,
+/// message, and request metadata.
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[allow(non_snake_case)]
 pub struct Response<T> {
+    /// The status of the response (OK or ERROR)
     pub status: Status,
 
+    /// Optional data payload returned by the API
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<T>,
 
+    /// Optional message providing additional information
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<Message>,
 
+    /// Optional URL of the request that generated this response
     #[serde(skip_serializing_if = "Option::is_none")]
     pub requestUrl: Option<String>,
 
+    /// Optional HTTP method used in the request
     #[serde(skip_serializing_if = "Option::is_none")]
     pub requestMethod: Option<String>,
+}
+
+impl<T> Response<T> {
+    /// Creates a new Response from a message and status
+    pub fn from_message(message: Message, status: Status) -> Self {
+        Self {
+            status,
+            data: None,
+            message: Some(message),
+            requestUrl: None,
+            requestMethod: None,
+        }
+    }
+
+    /// Creates a new Response from a string into the data field
+    pub fn from_string(data: String, status: Status) -> Response<String> {
+        Response::<String> {
+            status,
+            data: Some(data),
+            message: None,
+            requestUrl: None,
+            requestMethod: None,
+        }
+    }
 }
 
 impl<T> Response<T>
 where
     T: serde::Serialize,
 {
+    /// Prints the response result to stdout and exits with appropriate code
     pub fn print_result(&self) {
         match self.status {
             Status::OK => {
-                let json = serde_json::to_string_pretty(&self.data.as_ref().unwrap()).unwrap();
+                let json = serde_json::to_string_pretty(&self.data).unwrap();
 
                 self.redirect_stream(&json);
                 std::process::exit(exitcode::OK);
@@ -86,10 +125,11 @@ where
         }
     }
 
-    // This function is used to redirect the output to the appropriate stream
-    // If users are redirecting the output to a file, we don't want to print
-    // the success message but only the JSON response to ensure that the output
-    // is clean and can be used in other scripts
+    /// Redirects output to appropriate stream based on context
+    ///
+    /// If users are redirecting the output to a file, we don't want to print
+    /// the success message but only the JSON response to ensure that the output
+    /// is clean and can be used in other scripts
     fn redirect_stream(&self, json_str: &str) {
         if atty::is(Stream::Stdout) {
             println!("{}", success_message());
@@ -100,6 +140,7 @@ where
     }
 }
 
+/// Returns a formatted success message string
 fn success_message() -> String {
     format!(
         "{} {} - Received the following response: \n",
@@ -108,16 +149,19 @@ fn success_message() -> String {
     )
 }
 
-// This is a workaround to tackle the issue of having a nested message
-// in the response currently caused by the editMetadata endpoint
-//
-// For more info:
-// https://dataverse.zulipchat.com/#narrow/stream/378866-troubleshooting/topic/.E2.9C.94.20Duplicate.20file.20response
-//
+/// Represents a message that can be either plain text or nested.
+///
+/// This is a workaround to tackle the issue of having a nested message
+/// in the response currently caused by the editMetadata endpoint.
+///
+/// For more info:
+/// https://dataverse.zulipchat.com/#narrow/stream/378866-troubleshooting/topic/.E2.9C.94.20Duplicate.20file.20response
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(untagged)]
 pub enum Message {
+    /// A simple string message
     PlainMessage(String),
+    /// A message wrapped in a nested structure
     NestedMessage(NestedMessage),
 }
 
@@ -132,8 +176,10 @@ impl std::fmt::Display for Message {
     }
 }
 
+/// Represents a nested message structure returned by some Dataverse endpoints
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct NestedMessage {
+    /// The actual message content
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
 }
@@ -143,7 +189,6 @@ impl std::fmt::Display for NestedMessage {
         write!(f, "{}", self.message.as_ref().unwrap())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
