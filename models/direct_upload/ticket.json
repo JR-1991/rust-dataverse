@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "title": "TicketResponse",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/SinglePartTicket"
+    },
+    {
+      "$ref": "#/definitions/MultiPartTicket"
+    }
+  ],
+  "definitions": {
+    "SinglePartTicket": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": ["url"],
+      "allOf": [
+        {
+          "$ref": "#/definitions/BaseTicket"
+        }
+      ]
+    },
+    "MultiPartTicket": {
+      "type": "object",
+      "properties": {
+        "urls": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "abort": {
+          "type": "string",
+          "format": "uri"
+        },
+        "complete": {
+          "type": "string",
+          "format": "uri"
+        },
+        "partSize": {
+          "type": "integer"
+        }
+      },
+      "required": ["urls", "abort", "complete", "partSize"],
+      "allOf": [
+        {
+          "$ref": "#/definitions/BaseTicket"
+        }
+      ]
+    },
+    "BaseTicket": {
+      "type": "object",
+      "properties": {
+        "storageIdentifier": {
+          "type": "string"
+        }
+      },
+      "required": ["storageIdentifier"]
+    }
+  }
+}

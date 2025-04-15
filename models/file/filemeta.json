@@ -117,7 +117,7 @@
             "type": "string"
           }
         },
-        "datafile": {
+        "dataFile": {
           "type": "object",
           "$ref": "#/definitions/DataFile"
         }

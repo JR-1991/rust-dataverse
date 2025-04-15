@@ -15,32 +15,40 @@
     },
     "GetDatasetResponse": {
       "type": "object",
-      "properties": {
-        "id": {
-          "type": "integer"
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "integer"
+            },
+            "identifier": {
+              "type": "string"
+            },
+            "persistentUrl": {
+              "type": "string"
+            },
+            "protocol": {
+              "type": "string"
+            },
+            "authority": {
+              "type": "string"
+            },
+            "publisher": {
+              "type": "string"
+            },
+            "storageIdentifier": {
+              "type": "string"
+            },
+            "latestVersion": {
+              "$ref": "#/definitions/Dataset"
+            }
+          }
         },
-        "identifier": {
-          "type": "string"
-        },
-        "persistentUrl": {
-          "type": "string"
-        },
-        "protocol": {
-          "type": "string"
-        },
-        "authority": {
-          "type": "string"
-        },
-        "publisher": {
-          "type": "string"
-        },
-        "storageIdentifier": {
-          "type": "string"
-        },
-        "latestVersion": {
+        {
           "$ref": "#/definitions/Dataset"
         }
-      }
+      ]
     },
     "Dataset": {
       "type": "object",
@@ -114,24 +122,48 @@
         },
         "typeClass": {
           "type": "string",
-          "enum": ["primitive", "compound", "controlledVocabulary"]
+          "enum": [
+            "primitive",
+            "compound",
+            "controlledVocabulary"
+          ]
         },
         "value": {
           "oneOf": [
-            { "type": "string" },
-            { "type": "number" },
-            { "type": "boolean" },
-            { "type": "object" },
-            { "$ref": "#/definitions/Compound" },
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object"
+            },
+            {
+              "$ref": "#/definitions/Compound"
+            },
             {
               "type": "array",
               "items": {
                 "oneOf": [
-                  { "type": "string" },
-                  { "type": "number" },
-                  { "type": "boolean" },
-                  { "type": "object" },
-                  { "$ref": "#/definitions/Compound" }
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "object"
+                  },
+                  {
+                    "$ref": "#/definitions/Compound"
+                  }
                 ]
               }
             }
@@ -165,6 +197,9 @@
         },
         "dataFile": {
           "$ref": "#/definitions/DataFile"
+        },
+        "directoryLabel": {
+          "type": "string"
         }
       }
     },
