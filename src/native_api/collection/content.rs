@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use typify::import_types;
 
 use crate::{
@@ -52,7 +51,7 @@ pub async fn get_content(
 
     // Send request
     let context = RequestType::Plain;
-    let response = client.get(url.as_str(), None, &context).await;
+    let response = client.get(url.as_str(), None, context, None).await;
 
     evaluate_response::<Vec<CollectionContent>>(response).await
 }

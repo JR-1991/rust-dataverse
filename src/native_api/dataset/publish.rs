@@ -71,9 +71,9 @@ impl FromStr for Version {
 /// let client = BaseClient::new(&base_url, Some(&api_token))
 ///     .expect("Failed to create client");/// 
 /// let pid = "doi:10.5072/FK2/QJ8MRH";///
-/// 
+///
 /// let response = publish_dataset(&client, &pid, Version::Major).await?;
-/// 
+///
 ///  println!("Dataset published: {:?}", response);
 ///
 ///  # Ok(())
@@ -102,7 +102,7 @@ pub async fn publish_dataset(
 
     // Send request
     let context = RequestType::Plain;
-    let response = client.post(url, parameters, &context).await;
+    let response = client.post(url, parameters, context, None).await;
 
     evaluate_response::<DatasetPublishResponse>(response).await
 }
@@ -140,7 +140,7 @@ mod tests {
         let response = dataset::publish::publish_dataset(
             &client,
             &pid,
-            crate::native_api::dataset::publish::Version::Major,
+            dataset::publish::Version::Major,
         ).await;
 
         // Assert that the dataset was successfully published
@@ -174,7 +174,7 @@ mod tests {
         let response = dataset::publish::publish_dataset(
             &client,
             &pid,
-            crate::native_api::dataset::publish::Version::Minor,
+            dataset::publish::Version::Minor,
         ).await;
 
         // Assert that the dataset was successfully published
@@ -209,7 +209,7 @@ mod tests {
         let response = dataset::publish::publish_dataset(
             &client,
             &pid,
-            crate::native_api::dataset::publish::Version::UpdateCurrent,
+            dataset::publish::Version::UpdateCurrent,
         ).await;
 
         // Assert that the dataset was successfully published
@@ -241,7 +241,7 @@ mod tests {
         let response = dataset::publish::publish_dataset(
             &client,
             "non-existent-pid",
-            crate::native_api::dataset::publish::Version::Major,
+            dataset::publish::Version::Major,
         ).await;
 
         // Assert that the dataset was not published

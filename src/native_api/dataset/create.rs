@@ -1,17 +1,13 @@
-use serde::{Deserialize, Serialize};
 use serde_json;
 use typify::import_types;
 
 use crate::{
-    client::{BaseClient, evaluate_response},
+    client::{evaluate_response, BaseClient},
     request::RequestType,
     response::Response,
 };
 
-import_types!(
-    schema = "models/dataset/create.json",
-    struct_builder = true,
-);
+import_types!(schema = "models/dataset/create.json", struct_builder = true,);
 
 /// Creates a new dataset within a specified parent dataverse.
 ///
@@ -67,14 +63,14 @@ pub async fn create_dataset(
 
     // Send request
     let context = RequestType::JSON { body: body.clone() };
-    let response = client.post(url.as_str(), None, &context).await;
+    let response = client.post(url.as_str(), None, context, None).await;
 
     evaluate_response::<DatasetCreateResponse>(response).await
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::{BaseClient, dataset};
+    use crate::prelude::{dataset, BaseClient};
     use crate::test_utils::{extract_test_env, prepare_dataset_body};
 
     /// Tests the successful creation of a dataset under a specified parent dataverse.
@@ -98,13 +94,13 @@ mod tests {
     async fn test_create_dataset() {
         // Set up the client
         let (api_token, base_url, _) = extract_test_env();
-        let client = BaseClient::new(&base_url, Some(&api_token))
-            .expect("Failed to create client");
+        let client = BaseClient::new(&base_url, Some(&api_token)).expect("Failed to create client");
 
         // Create a dataset
         let body = prepare_dataset_body("./tests/fixtures/create_dataset_body.json".into());
         let response = dataset::create::create_dataset(&client, "root", body)
-            .await.expect("Failed to create dataset");
+            .await
+            .expect("Failed to create dataset");
 
         // Assert the request was successful
         assert!(response.status.is_ok());
@@ -134,13 +130,13 @@ mod tests {
     async fn test_invalid_dataset_body() {
         // Set up the client
         let (api_token, base_url, _) = extract_test_env();
-        let client = BaseClient::new(&base_url, Some(&api_token))
-            .expect("Failed to create client");
+        let client = BaseClient::new(&base_url, Some(&api_token)).expect("Failed to create client");
 
         // Create a dataset
         let body = prepare_dataset_body("./tests/fixtures/create_invalid_dataset_body.json".into());
         let response = dataset::create::create_dataset(&client, "Root", body)
-            .await.expect("Failed to create dataset");
+            .await
+            .expect("Failed to create dataset");
 
         // Assert the request has failed
         assert!(response.status.is_err());
@@ -168,13 +164,13 @@ mod tests {
     async fn test_non_existent_parent() {
         // Set up the client
         let (api_token, base_url, _) = extract_test_env();
-        let client = BaseClient::new(&base_url, Some(&api_token))
-            .expect("Failed to create client");
+        let client = BaseClient::new(&base_url, Some(&api_token)).expect("Failed to create client");
 
         // Create a dataset
         let body = prepare_dataset_body("./tests/fixtures/create_dataset_body.json".into());
         let response = dataset::create::create_dataset(&client, "non_existent_parent", body)
-            .await.expect("Failed to create dataset");
+            .await
+            .expect("Failed to create dataset");
 
         // Assert the request has failed
         assert!(response.status.is_err());

@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use serde_json;
 use typify::import_types;
 
@@ -63,7 +62,7 @@ pub async fn create_collection(
 
     // Send request
     let context = RequestType::JSON { body: body.clone() };
-    let response = client.post(url.as_str(), None, &context).await;
+    let response = client.post(url.as_str(), None, context, None).await;
 
     evaluate_response::<CollectionCreateResponse>(response).await
 }

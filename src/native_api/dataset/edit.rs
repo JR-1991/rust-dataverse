@@ -1,19 +1,15 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
 use serde_json;
 use typify::import_types;
 
 use crate::{
-    client::{BaseClient, evaluate_response},
+    client::{evaluate_response, BaseClient},
     request::RequestType,
     response::Response,
 };
 
-import_types!(
-    schema = "models/dataset/edit.json",
-    struct_builder = true,
-);
+import_types!(schema = "models/dataset/edit.json", struct_builder = true);
 
 /// Edits the metadata of a dataset identified by a persistent identifier (PID).
 ///
@@ -45,7 +41,7 @@ import_types!(
 /// let base_url = "https://demo.dataverse.com".to_string();
 /// let client = BaseClient::new(&base_url, Some(&api_token))
 ///     .expect("Failed to create client");
-/// 
+///
 /// let pid = "persistentId123";
 /// let replace = true;
 /// let body = dataset::edit::EditMetadataBody {
@@ -55,7 +51,7 @@ import_types!(
 /// };
 ///
 /// let response = dataset::edit_dataset_metadata(&client, pid, &replace, body).await?;
-/// 
+///
 /// println!("Dataset metadata updated: {:?}", response);
 /// # Ok(())
 /// # }
@@ -80,14 +76,14 @@ pub async fn edit_dataset_metadata(
 
     // Send request
     let context = RequestType::JSON { body: body.clone() };
-    let response = client.put(&url, parameters, &context).await;
+    let response = client.put(url, parameters, context, None).await;
 
     evaluate_response::<Dataset>(response).await
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::{BaseClient, dataset};
+    use crate::prelude::{dataset, BaseClient};
     use crate::test_utils::{create_test_dataset, extract_test_env, prepare_edit_dataset_body};
 
     /// Tests the editing of dataset metadata with replacement.
@@ -109,8 +105,7 @@ mod tests {
     async fn test_edit_dataset_metadata() {
         // Set up the client
         let (api_token, base_url, _) = extract_test_env();
-        let client = BaseClient::new(&base_url, Some(&api_token))
-            .expect("Failed to create client");
+        let client = BaseClient::new(&base_url, Some(&api_token)).expect("Failed to create client");
 
         // Create a dataset
         let (_, pid) = create_test_dataset(&client, "Root").await;
@@ -118,7 +113,8 @@ mod tests {
         // Edit the dataset metadata
         let body = prepare_edit_dataset_body();
         let response = dataset::edit::edit_dataset_metadata(&client, &pid, &true, body)
-            .await.expect("Failed to edit dataset metadata");
+            .await
+            .expect("Failed to edit dataset metadata");
 
         // Assert the request was successful
         let message = serde_json::to_string(&response).unwrap();
@@ -144,8 +140,7 @@ mod tests {
     async fn test_edit_dataset_metadata_replace_false() {
         // Set up the client
         let (api_token, base_url, _) = extract_test_env();
-        let client = BaseClient::new(&base_url, Some(&api_token))
-            .expect("Failed to create client");
+        let client = BaseClient::new(&base_url, Some(&api_token)).expect("Failed to create client");
 
         // Create a dataset
         let (_, pid) = create_test_dataset(&client, "Root").await;
@@ -153,7 +148,8 @@ mod tests {
         // Edit the dataset metadata
         let body = prepare_edit_dataset_body();
         let response = dataset::edit::edit_dataset_metadata(&client, &pid, &false, body)
-            .await.expect("Failed to edit dataset metadata");
+            .await
+            .expect("Failed to edit dataset metadata");
 
         // Assert the request was successful
         let message = serde_json::to_string(&response).unwrap();
@@ -179,13 +175,13 @@ mod tests {
     async fn test_edit_dataset_metadata_invalid_pid() {
         // Set up the client
         let (api_token, base_url, _) = extract_test_env();
-        let client = BaseClient::new(&base_url, Some(&api_token))
-            .expect("Failed to create client");
+        let client = BaseClient::new(&base_url, Some(&api_token)).expect("Failed to create client");
 
         // Edit the dataset metadata
         let body = prepare_edit_dataset_body();
         let response = dataset::edit::edit_dataset_metadata(&client, "invalid_pid", &true, body)
-            .await.expect("Failed to edit dataset metadata");
+            .await
+            .expect("Failed to edit dataset metadata");
 
         // Assert the request was successful
         assert!(response.status.is_err());

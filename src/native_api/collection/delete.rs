@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use typify::import_types;
 
 use crate::{
@@ -37,7 +36,7 @@ import_types!(schema = "models/collection/delete.json");
 ///
 /// let alias = "my_collection";
 /// let result = collection::delete_collection(&client, alias).await?;
-/// 
+///
 /// println!("Deletion result: {:?}", result);
 /// # Ok(())
 /// # }
@@ -51,7 +50,7 @@ pub async fn delete_collection(
 
     // Send request
     let context = RequestType::Plain;
-    let response = client.delete(url.as_str(), None, &context).await;
+    let response = client.delete(url.as_str(), None, context, None).await;
 
     evaluate_response::<CollectionDeleteResponse>(response).await
 }

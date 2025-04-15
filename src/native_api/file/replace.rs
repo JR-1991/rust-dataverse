@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use serde_json;
 
+use crate::file::callback::CallbackFun;
+use crate::file::uploadfile::UploadFile;
 use crate::{
-    callback::CallbackFun,
-    client::{BaseClient, evaluate_response},
+    client::{evaluate_response, BaseClient},
     native_api::dataset::upload::{UploadBody, UploadResponse},
     request::RequestType,
     response::Response,
@@ -32,21 +32,19 @@ use crate::{
 pub async fn replace_file(
     client: &BaseClient,
     id: &str,
-    fpath: PathBuf,
-    body: &Option<UploadBody>,
-    callbacks: Option<HashMap<String, CallbackFun>>,
+    file: impl Into<UploadFile>,
+    body: Option<UploadBody>,
+    callbacks: Option<Vec<CallbackFun>>,
 ) -> Result<Response<UploadResponse>, String> {
     // Endpoint metadata
     let path = format!("api/files/{}/replace", id);
 
     // Build hash maps and body for the request
-    let file = HashMap::from([("file".to_string(), fpath)]);
-    let body = Option::map(
-        body.as_ref(),
-        |b| HashMap::from([
-            ("jsonData".to_string(), serde_json::to_string(&b).unwrap())
-        ]),
-    );
+    let file: HashMap<String, UploadFile> = HashMap::from([("file".to_string(), file.into())]);
+    let callbacks = callbacks.map(|c| HashMap::from([("file".to_string(), c)]));
+    let body = body
+        .as_ref()
+        .map(|b| HashMap::from([("jsonData".to_string(), serde_json::to_string(&b).unwrap())]));
 
     // Send request
     let context = RequestType::Multipart {
@@ -55,7 +53,50 @@ pub async fn replace_file(
         callbacks,
     };
 
-    let response = client.post(path.as_str(), None, &context).await;
+    let response = client.post(path.as_str(), None, context, None).await;
 
     evaluate_response::<UploadResponse>(response).await
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use crate::{
+        prelude::{dataset::upload_file_to_dataset, Identifier},
+        test_utils::{create_test_client, create_test_dataset},
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_replace_file() {
+        // Arrange
+        // Setup client and dataset
+        let client = create_test_client();
+        let (_, pid) = create_test_dataset(&client, "Root").await;
+
+        // Upload a file
+        let file_content =
+            fs::read_to_string("tests/fixtures/file.txt").expect("Failed to read file");
+        let file_response = upload_file_to_dataset(
+            &client,
+            Identifier::PersistentId(pid.clone()),
+            "tests/fixtures/file.txt",
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to upload file");
+
+        // Get file id
+        let file = file_response
+            .data
+            .expect("Failed to get file response")
+            .files
+            .first()
+            .expect("Failed to get file id");
+
+        // Replace file
+    }
 }

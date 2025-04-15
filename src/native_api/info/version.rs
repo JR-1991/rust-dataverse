@@ -1,5 +1,4 @@
 use regress;
-use serde::{Deserialize, Serialize};
 use typify::import_types;
 
 use crate::{
@@ -24,7 +23,7 @@ import_types!(schema = "models/info/version.json");
 /// response data indicating the version information, if the request is successful, or a `String` error message on failure.
 pub async fn get_version(client: &BaseClient) -> Result<Response<VersionResponse>, String> {
     let context = RequestType::Plain;
-    let response = client.get("api/info/version", None, &context).await;
+    let response = client.get("api/info/version", None, context, None).await;
 
     evaluate_response::<VersionResponse>(response).await
 }

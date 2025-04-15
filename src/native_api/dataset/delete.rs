@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use typify::import_types;
 
 use crate::{
@@ -55,7 +54,7 @@ pub async fn delete_dataset(
 
     // Send request
     let context = RequestType::Plain;
-    let response = client.delete(url.as_str(), None, &context).await;
+    let response = client.delete(url.as_str(), None, context, None).await;
 
     evaluate_response::<UnpublishedDatasetDeleteResponse>(response).await
 }

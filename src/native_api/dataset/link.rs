@@ -1,18 +1,15 @@
-use serde::{Deserialize, Serialize};
 use typify::import_types;
 
+use crate::prelude::DatasetVersion;
 use crate::{
-    client::{BaseClient, evaluate_response},
+    client::{evaluate_response, BaseClient},
     identifier::Identifier,
     request::RequestType,
     response::Response,
     utils::get_dataset_id,
 };
 
-import_types!(
-    schema = "models/message.json",
-    struct_builder = true,
-);
+import_types!(schema = "models/message.json", struct_builder = true,);
 
 /// Links a dataset to a specified collection.
 ///
@@ -31,37 +28,17 @@ import_types!(
 ///
 /// A `Result` wrapping a `Response<MessageResponse>`, which contains the HTTP response status and the deserialized
 /// response data indicating the outcome of the linking operation, if the request is successful, or a `String` error message on failure.
-///
-/// # Examples
-///
-/// Basic usage:
-///
-/// ```no_run
-/// use dataverse::prelude::*;
-/// # async fn run() -> Result<(), String> {
-/// let api_token = "api_token".to_string();
-/// let base_url = "https://demo.dataverse.com".to_string();
-/// let client = BaseClient::new(&base_url, Some(&api_token))
-///     .expect("Failed to create client");
-///
-/// let dataset_id = Identifier::Id(123);
-/// let collection_id = "456";
-///
-/// let response = dataset::link_dataset(&client, dataset_id, collection_id).await?;
-///
-/// println!("Dataset linked to collection: {:?}", response);
-/// # Ok(())
-/// # }
-/// ```
 pub async fn link_dataset(
     client: &BaseClient,
-    id: Identifier,
+    id: &Identifier,
     collection_id: &str,
 ) -> Result<Response<MessageResponse>, String> {
     // Determine dataset id
     let dataset_id = match id {
-        Identifier::PersistentId(_) => get_dataset_id(client, id).await?,
-        Identifier::Id(id) => id.clone(),
+        Identifier::PersistentId(_) => {
+            get_dataset_id(client, id, DatasetVersion::Latest.into()).await?
+        }
+        Identifier::Id(id) => *id,
     };
 
     // Endpoint metadata
@@ -69,15 +46,14 @@ pub async fn link_dataset(
 
     // Send request
     let context = RequestType::Plain;
-    let response = client.put(&url, None, &context).await;
+    let response = client.put(&url, None, context, None).await;
 
     evaluate_response::<MessageResponse>(response).await
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::{BaseClient, dataset};
-    use crate::test_utils;
+    use crate::prelude::{dataset, BaseClient, Identifier};
     use crate::test_utils::{create_test_collection, create_test_dataset, extract_test_env};
 
     /// Tests linking a dataset to a collection using the dataset ID.
@@ -99,9 +75,8 @@ mod tests {
     #[tokio::test]
     async fn test_link_dataset_using_id() {
         // Set up the client
-        let (api_token, base_url, _) = test_utils::extract_test_env();
-        let client = BaseClient::new(&base_url, Some(&api_token))
-            .expect("Failed to create client");
+        let (api_token, base_url, _) = extract_test_env();
+        let client = BaseClient::new(&base_url, Some(&api_token)).expect("Failed to create client");
 
         // Create a test collection
         let collection_id = create_test_collection(&client, "Root").await;
@@ -112,9 +87,10 @@ mod tests {
         // Link the dataset to the collection
         let response = dataset::link::link_dataset(
             &client,
-            crate::identifier::Identifier::Id(dataset_id),
+            &crate::identifier::Identifier::Id(dataset_id),
             &collection_id,
-        ).await;
+        )
+        .await;
 
         assert!(response.is_ok());
     }
@@ -137,8 +113,7 @@ mod tests {
     async fn test_link_dataset_using_pid() {
         // Set up the client
         let (api_token, base_url, _) = extract_test_env();
-        let client = BaseClient::new(&base_url, Some(&api_token))
-            .expect("Failed to create client");
+        let client = BaseClient::new(&base_url, Some(&api_token)).expect("Failed to create client");
 
         // Create a test collection
         let collection_id = create_test_collection(&client, "Root").await;
@@ -149,9 +124,10 @@ mod tests {
         // Link the dataset to the collection
         let response = dataset::link::link_dataset(
             &client,
-            crate::identifier::Identifier::PersistentId(persistent_id),
+            &Identifier::PersistentId(persistent_id),
             &collection_id,
-        ).await;
+        )
+        .await;
 
         assert!(response.is_ok());
     }
@@ -175,18 +151,14 @@ mod tests {
     async fn test_link_non_existent_dataset() {
         // Set up the client
         let (api_token, base_url, _) = extract_test_env();
-        let client = BaseClient::new(&base_url, Some(&api_token))
-            .expect("Failed to create client");
+        let client = BaseClient::new(&base_url, Some(&api_token)).expect("Failed to create client");
 
         // Create a test collection
         let collection_id = create_test_collection(&client, "Root").await;
 
         // Link a non-existent dataset to the collection
-        let response = dataset::link::link_dataset(
-            &client,
-            crate::identifier::Identifier::Id(-1),
-            &collection_id,
-        ).await;
+        let response =
+            dataset::link::link_dataset(&client, &Identifier::Id(-1), &collection_id).await;
 
         let message = serde_json::to_string(&response).unwrap();
         assert!(message.contains("ERROR")); // Ugly, but it works
@@ -211,8 +183,7 @@ mod tests {
     async fn test_link_non_existent_collection() {
         // Set up the client
         let (api_token, base_url, _) = extract_test_env();
-        let client = BaseClient::new(&base_url, Some(&api_token))
-            .expect("Failed to create client");
+        let client = BaseClient::new(&base_url, Some(&api_token)).expect("Failed to create client");
 
         // Create a test dataset
         let (dataset_id, _) = create_test_dataset(&client, "Root").await;
@@ -220,9 +191,10 @@ mod tests {
         // Link the dataset to a non-existent collection
         let response = dataset::link::link_dataset(
             &client,
-            crate::identifier::Identifier::Id(dataset_id),
+            &Identifier::Id(dataset_id),
             "non_existent_collection",
-        ).await;
+        )
+        .await;
 
         let message = serde_json::to_string(&response).unwrap();
         assert!(message.contains("ERROR")); // Ugly, but it works
