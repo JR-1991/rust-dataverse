@@ -10,13 +10,13 @@ mod tests {
     use dataverse::native_api::dataset::create::DatasetCreateBody;
 
     lazy_static! {
-        static ref BASE_URL: String = std::env::var("BASE_URL")
-            .expect("BASE_URL must be set for tests");
+        static ref BASE_URL: String =
+            std::env::var("BASE_URL").expect("BASE_URL must be set for tests");
     }
 
     lazy_static! {
-        static ref API_TOKEN: String = std::env::var("API_TOKEN")
-            .expect("API_TOKEN must be set for tests");
+        static ref API_TOKEN: String =
+            std::env::var("API_TOKEN").expect("API_TOKEN must be set for tests");
     }
 
     #[tokio::test]
@@ -29,7 +29,7 @@ mod tests {
         let body = serde_json::from_str::<DatasetCreateBody>(&body);
 
         // Act
-        let response = dataset::create::create_dataset(&client, &"Root".to_string(), body.unwrap())
+        let response = dataset::create::create_dataset(&client, "Root", body.unwrap())
             .await
             .expect("Could not create dataset");
 
@@ -59,13 +59,13 @@ mod tests {
     async fn test_dataset_publish() {
         // Part 1: Create a dataset
         // Arrange
-        let client = BaseClient::new(&BASE_URL.to_string(), Some(&API_TOKEN.to_string())).unwrap();
+        let client = BaseClient::new(&BASE_URL, Some(&API_TOKEN)).unwrap();
         let body = fs::read_to_string("tests/fixtures/create_dataset_body.json")
             .expect("Could not read body");
         let body = serde_json::from_str::<DatasetCreateBody>(&body);
 
         // Act
-        let response = dataset::create::create_dataset(&client, &"Root".to_string(), body.unwrap())
+        let response = dataset::create::create_dataset(&client, "Root", body.unwrap())
             .await
             .expect("Could not create dataset");
 
@@ -88,8 +88,8 @@ mod tests {
             &dataset_id,
             dataset::publish::Version::Major,
         )
-            .await
-            .expect("Could not publish dataset");
+        .await
+        .expect("Could not publish dataset");
 
         // Assert
         assert_eq!(
@@ -108,10 +108,9 @@ mod tests {
             .expect("Could not read body");
 
         let body = serde_json::from_str::<DatasetCreateBody>(&body);
-        let response =
-            dataset::create::create_dataset(&client, &"Root".to_string(), body.unwrap())
-                .await
-                .expect("Could not create dataset");
+        let response = dataset::create::create_dataset(&client, "Root", body.unwrap())
+            .await
+            .expect("Could not create dataset");
 
         // Act
         let dataset_id = response
@@ -123,12 +122,12 @@ mod tests {
         let response = dataset::upload::upload_file_to_dataset(
             &client,
             dataset_id,
-            "tests/fixtures/create_dataset_body.json".into(),
+            "tests/fixtures/create_dataset_body.json",
             None,
             None,
         )
-            .await
-            .expect("Could not upload file");
+        .await
+        .expect("Could not upload file");
 
         // Assert
         assert_eq!(
