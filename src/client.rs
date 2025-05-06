@@ -70,6 +70,15 @@ impl BaseClient {
         headers
     }
 
+    /// Get the base URL of the client
+    ///
+    /// # Returns
+    ///
+    /// A reference to the base URL of the client
+    pub fn base_url(&self) -> &Url {
+        &self.base_url
+    }
+
     pub async fn get(
         &self,
         path: &str,
