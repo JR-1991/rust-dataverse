@@ -338,10 +338,8 @@ impl From<&str> for UploadFile {
     fn from(path: &str) -> Self {
         let source = match Url::parse(path) {
             Ok(url) => FileSource::RemoteUrl(url),
-            Err(_) => FileSource::Path(PathBuf::from(path)),
+            Err(_) => FileSource::Path(relative_to_absolute_path(&PathBuf::from(path)).unwrap()),
         };
-
-        dbg!(&path);
 
         let fsize = match source {
             FileSource::RemoteUrl(_) => 0,
@@ -384,7 +382,9 @@ impl From<PathBuf> for UploadFile {
     fn from(path: PathBuf) -> Self {
         assert!(path.exists(), "File does not exist");
 
-        let fsize = std::fs::metadata(&path)
+        // Convert the path to an absolute path, if it is relative
+        let absolute_path = relative_to_absolute_path(&path).unwrap();
+        let fsize = std::fs::metadata(&absolute_path)
             .expect("Could not get file metadata")
             .len();
 
@@ -397,7 +397,7 @@ impl From<PathBuf> for UploadFile {
 
         let dir = path.parent().map(|p| p.to_path_buf());
 
-        Self::new(fname, dir, FileSource::Path(path), fsize)
+        Self::new(fname, dir, FileSource::Path(absolute_path), fsize)
     }
 }
 
@@ -511,7 +511,10 @@ impl From<&str> for FileSource {
             let path = PathBuf::from(path);
             assert!(path.exists(), "File does not exist");
 
-            FileSource::Path(path)
+            // Convert the path to an absolute path, if it is relative
+            let absolute_path = relative_to_absolute_path(&path).unwrap();
+
+            FileSource::Path(absolute_path)
         }
     }
 }
@@ -532,7 +535,10 @@ impl From<String> for FileSource {
             let path = PathBuf::from(path);
             assert!(path.exists(), "File does not exist");
 
-            FileSource::Path(path)
+            // Convert the path to an absolute path, if it is relative
+            let absolute_path = relative_to_absolute_path(&path).unwrap();
+
+            FileSource::Path(absolute_path)
         }
     }
 }
@@ -568,12 +574,27 @@ impl FromStr for FileSource {
             Err(_) => {
                 let path = PathBuf::from(s);
                 if path.exists() {
-                    Ok(FileSource::Path(path))
+                    Ok(FileSource::Path(relative_to_absolute_path(&path).unwrap()))
                 } else {
                     Err("Invalid file source".to_string())
                 }
             }
         }
+    }
+}
+
+/// Converts a relative path to an absolute path.
+///
+/// # Arguments
+/// * `path` - The path to convert.
+///
+/// # Returns
+/// A `Result` containing the absolute path or an error.
+fn relative_to_absolute_path(path: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
+    if path.is_absolute() {
+        Ok(path.clone())
+    } else {
+        Ok(std::env::current_dir()?.join(path))
     }
 }
 
@@ -1053,5 +1074,22 @@ mod tests {
         for mock in mocks.into_iter() {
             mock.assert();
         }
+    }
+
+    #[test]
+    fn test_relative_to_absolute_path() {
+        let path = PathBuf::from("test.txt");
+        let current_dir = std::env::current_dir().unwrap();
+        let absolute_path = relative_to_absolute_path(&path).unwrap();
+        assert_eq!(absolute_path, current_dir.join("test.txt"));
+    }
+
+    #[test]
+    fn test_absolute_path() {
+        let path = std::env::current_dir()
+            .unwrap()
+            .join(PathBuf::from("/test.txt"));
+        let absolute_path = relative_to_absolute_path(&path).unwrap();
+        assert_eq!(absolute_path, path);
     }
 }
