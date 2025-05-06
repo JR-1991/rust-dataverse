@@ -2,6 +2,32 @@
   "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
   "definitions": {
+    "BatchDirectUploadResponse": {
+      "type": "object",
+      "properties": {
+        "Files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fileDetails": {
+                "$ref": "#/definitions/DataFileUpload"
+              },
+              "errorMessage": {
+                "type": "string"
+              },
+              "warningMessage": {
+                "type": "string"
+              },
+              "successMessage": {
+                "type": "string"
+              }
+            },
+            "required": ["fileDetails"]
+          }
+        }
+      }
+    },
     "DirectUploadResponse": {
       "type": "object",
       "properties": {
