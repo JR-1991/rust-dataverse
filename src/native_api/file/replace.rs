@@ -63,11 +63,13 @@ mod tests {
     use std::fs;
 
     use crate::{
-        prelude::{dataset::upload_file_to_dataset, Identifier},
+        prelude::{
+            dataset::upload_file_to_dataset,
+            file::{get_file_meta, replace_file},
+            Identifier,
+        },
         test_utils::{create_test_client, create_test_dataset},
     };
-
-    use super::*;
 
     #[tokio::test]
     async fn test_replace_file() {
@@ -77,8 +79,6 @@ mod tests {
         let (_, pid) = create_test_dataset(&client, "Root").await;
 
         // Upload a file
-        let file_content =
-            fs::read_to_string("tests/fixtures/file.txt").expect("Failed to read file");
         let file_response = upload_file_to_dataset(
             &client,
             Identifier::PersistentId(pid.clone()),
@@ -90,13 +90,61 @@ mod tests {
         .expect("Failed to upload file");
 
         // Get file id
-        let file = file_response
-            .data
-            .expect("Failed to get file response")
-            .files
-            .first()
+        let file_response = file_response.data.expect("Failed to get file response");
+        let file = file_response.files.first().expect("Failed to get file id");
+        let file_id = file
+            .data_file
+            .as_ref()
+            .expect("Failed to get data file")
+            .id
             .expect("Failed to get file id");
 
+        // ACT
         // Replace file
+        let replace_response = replace_file(
+            &client,
+            &file_id.to_string(),
+            "tests/fixtures/file_to_replace.txt",
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to replace file");
+
+        // Assert
+        assert!(replace_response.status.is_ok());
+
+        let response = replace_response
+            .data
+            .expect("Failed to get replace response");
+        let response = response.files.first().expect("Failed to get file id");
+
+        let replaced_file_id = response
+            .data_file
+            .as_ref()
+            .expect("Failed to get data file")
+            .id
+            .expect("Failed to get file id");
+
+        let file_meta = get_file_meta(&client, &Identifier::Id(replaced_file_id))
+            .await
+            .expect("Failed to get file meta");
+
+        let data_file = file_meta
+            .data
+            .expect("Failed to get file meta data")
+            .data_file
+            .expect("Failed to get data file");
+        let expected_hash = format!(
+            "{:x}",
+            md5::compute(
+                fs::read("tests/fixtures/file_to_replace.txt").expect("Failed to read file"),
+            )
+        );
+
+        assert_eq!(
+            data_file.md5.expect("Failed to get md5 from file meta"),
+            expected_hash
+        );
     }
 }
