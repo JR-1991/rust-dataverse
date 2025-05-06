@@ -66,8 +66,12 @@ pub mod search_api {
 /// Direct upload functionality
 pub mod direct_upload {
     pub use upload::direct_upload;
+    /// Database operations
+    mod db;
     /// Hasher functionality
     pub mod hasher;
+    /// Database model
+    pub mod model;
     /// Upload ticket handling
     pub(crate) mod ticket;
     /// Direct upload operations
