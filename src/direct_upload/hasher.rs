@@ -58,6 +58,9 @@ pub trait Hasher {
     ///
     /// A `Result` indicating success or an error if the operation failed
     fn add_to_payload(&self, payload: &mut DirectUploadBody) -> Result<(), Box<dyn Error + '_>>;
+
+    /// Returns the algorithm used to hash the file
+    fn algorithm(&self) -> &str;
 }
 
 /// Enum representing different hash algorithms supported by the system.
@@ -83,6 +86,20 @@ impl FileHash {
             "SHA-512" => Ok(FileHash::SHA512(SHA512Hasher::new())),
             "SHA-1" => Ok(FileHash::SHA1(SHA1Hasher::new())),
             _ => Err("Invalid hash algorithm".to_string()),
+        }
+    }
+}
+
+impl Clone for FileHash {
+    // For this clone method, we need to create a new instance of the FileHash struct
+    // with the same algorithm. This is because the Derive Clone for FileHash struct
+    // will not work as expected because the hasher state is shared across threads.
+    fn clone(&self) -> Self {
+        match self {
+            FileHash::MD5(_) => FileHash::new("MD5").unwrap(),
+            FileHash::SHA256(_) => FileHash::new("SHA-256").unwrap(),
+            FileHash::SHA512(_) => FileHash::new("SHA-512").unwrap(),
+            FileHash::SHA1(_) => FileHash::new("SHA-1").unwrap(),
         }
     }
 }
@@ -154,6 +171,15 @@ impl Hasher for FileHash {
             FileHash::SHA1(hasher) => hasher.add_to_payload(payload),
         }
     }
+
+    fn algorithm(&self) -> &str {
+        match self {
+            FileHash::MD5(hasher) => hasher.algorithm(),
+            FileHash::SHA256(hasher) => hasher.algorithm(),
+            FileHash::SHA512(hasher) => hasher.algorithm(),
+            FileHash::SHA1(hasher) => hasher.algorithm(),
+        }
+    }
 }
 
 impl FileHash {
@@ -170,8 +196,8 @@ impl FileHash {
     /// # Returns
     ///
     /// A `Result` indicating success or an error if the operation failed
-    pub async fn hash(&self, file: UploadFile) -> Result<(), String> {
-        let mut file = match file.file {
+    pub async fn hash(&self, file: impl Into<UploadFile>) -> Result<(), String> {
+        let mut file = match file.into().file {
             FileSource::File(file) => file,
             FileSource::Path(path) => File::open(path).await.map_err(|e| e.to_string())?,
             _ => return Err("Unsupported file type".into()),
@@ -196,6 +222,7 @@ impl FileHash {
 ///
 /// This struct wraps an MD5 context in a thread-safe container to allow for
 /// concurrent access and modification during streaming hash computation.
+#[derive(Clone)]
 pub struct MD5Hasher(Arc<Mutex<md5::Context>>);
 
 impl MD5Hasher {
@@ -232,12 +259,17 @@ impl Hasher for MD5Hasher {
     fn add_to_payload(&self, payload: &mut DirectUploadBody) -> Result<(), Box<dyn Error + '_>> {
         add_checksum(payload, MD5, self.compute()?)
     }
+
+    fn algorithm(&self) -> &str {
+        MD5
+    }
 }
 
 /// Implementation of the SHA-256 hash algorithm.
 ///
 /// This struct wraps a SHA-256 context in a thread-safe container to allow for
 /// concurrent access and modification during streaming hash computation.
+#[derive(Clone)]
 pub struct SHA256Hasher(Arc<Mutex<Sha256>>);
 
 impl SHA256Hasher {
@@ -274,12 +306,17 @@ impl Hasher for SHA256Hasher {
     fn add_to_payload(&self, payload: &mut DirectUploadBody) -> Result<(), Box<dyn Error + '_>> {
         add_checksum(payload, SHA256, self.compute()?)
     }
+
+    fn algorithm(&self) -> &str {
+        SHA256
+    }
 }
 
 /// Implementation of the SHA-512 hash algorithm.
 ///
 /// This struct wraps a SHA-512 context in a thread-safe container to allow for
 /// concurrent access and modification during streaming hash computation.
+#[derive(Clone)]
 pub struct SHA512Hasher(Arc<Mutex<Sha512>>);
 
 impl SHA512Hasher {
@@ -316,12 +353,17 @@ impl Hasher for SHA512Hasher {
     fn add_to_payload(&self, payload: &mut DirectUploadBody) -> Result<(), Box<dyn Error + '_>> {
         add_checksum(payload, SHA512, self.compute()?)
     }
+
+    fn algorithm(&self) -> &str {
+        SHA512
+    }
 }
 
 /// Implementation of the SHA-1 hash algorithm.
 ///
 /// This struct wraps a SHA-1 context in a thread-safe container to allow for
 /// concurrent access and modification during streaming hash computation.
+#[derive(Clone)]
 pub struct SHA1Hasher(Arc<Mutex<Sha1>>);
 
 impl SHA1Hasher {
@@ -358,6 +400,10 @@ impl Hasher for SHA1Hasher {
     fn add_to_payload(&self, payload: &mut DirectUploadBody) -> Result<(), Box<dyn Error + '_>> {
         add_checksum(payload, SHA1, self.compute()?)
     }
+
+    fn algorithm(&self) -> &str {
+        SHA1
+    }
 }
 
 /// Adds a checksum to a DirectUploadBody payload.
@@ -374,7 +420,7 @@ impl Hasher for SHA1Hasher {
 /// # Returns
 ///
 /// A `Result` indicating success or an error if the operation failed
-fn add_checksum(
+pub(crate) fn add_checksum(
     payload: &mut DirectUploadBody,
     algorithm: &str,
     hash: String,

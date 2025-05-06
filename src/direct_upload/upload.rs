@@ -1,8 +1,13 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::str::FromStr;
+use std::sync::Arc;
 
-use itertools::Itertools;
+use chrono::{Duration, Utc};
 use reqwest::header::{HeaderMap, HeaderValue};
+use serde::{Deserialize, Serialize};
+use sqlx::{Pool, Sqlite};
+use tokio::sync::Semaphore;
 use typify::import_types;
 
 use crate::check_lock;
@@ -14,7 +19,9 @@ use crate::prelude::{CallbackFun, Identifier};
 use crate::request::RequestType;
 use crate::response::Response;
 
-use super::hasher::{FileHash, Hasher};
+use super::db::create_database;
+use super::hasher::{add_checksum, FileHash, Hasher};
+use super::model::Upload;
 use super::ticket::{MultiPartTicket, SinglePartTicket, TicketResponse};
 
 import_types!(
@@ -23,15 +30,31 @@ import_types!(
     derives = [Default]
 );
 
-// pub async fn batch_direct_upload(
-//     client: &BaseClient,
-//     id: Identifier,
-//     files: Vec<impl Into<UploadFile>>,
-//     hasher: impl TryInto<FileHash, Error = String>,
-//     body: Option<Vec<DirectUploadBody>>,
-//     n_parallel: usize,
-// ) {
-// }
+/// A batch of direct upload bodies.
+///
+/// This is a wrapper around a vector of direct upload bodies.
+/// It is used to pass a batch of upload bodies to the batch upload function.
+///
+/// # Fields
+///
+/// * `body` - The vector of direct upload bodies
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct BatchDirectUploadBody(pub Vec<DirectUploadBody>);
+
+impl From<Vec<DirectUploadBody>> for BatchDirectUploadBody {
+    /// Convert a vector of direct upload bodies to a batch of direct upload bodies.
+    ///
+    /// # Arguments
+    ///
+    /// * `body` - The vector of direct upload bodies
+    ///
+    /// # Returns
+    ///
+    /// A `BatchDirectUploadBody`
+    fn from(body: Vec<DirectUploadBody>) -> Self {
+        BatchDirectUploadBody(body)
+    }
+}
 
 /// Uploads a file directly to a Dataverse dataset using the direct upload API.
 ///
@@ -41,18 +64,17 @@ import_types!(
 /// 3. Computing file hashes during upload for integrity verification
 /// 4. Registering the uploaded file with the dataset
 ///
-/// The function supports both single-part and multi-part uploads based on the
-/// ticket type returned by the server. The appropriate upload method is selected
-/// automatically.
+/// This function is the main entry point for the direct upload process and is
+/// responsible for handling the complete upload lifecycle.
 ///
 /// # Arguments
 ///
 /// * `client` - The base client used for API communication
-/// * `id` - Dataset identifier (either persistent ID or database ID)
-/// * `file` - The file to be uploaded
-/// * `hasher` - The hash algorithm to use for file integrity verification
-/// * `body` - Upload metadata including file name, description, etc.
-/// * `callbacks` - Optional vector of callback functions for progress tracking
+/// * `id` - The identifier of the dataset to upload the file to
+/// * `file` - The file to upload
+/// * `hasher` - The hasher to use for the upload
+/// * `body` - The body of the upload request
+/// * `callbacks` - The callbacks to use for the upload
 ///
 /// # Returns
 ///
@@ -67,30 +89,224 @@ pub async fn direct_upload(
     body: DirectUploadBody,
     callbacks: Option<Vec<CallbackFun>>,
 ) -> Result<Response<DirectUploadResponse>, String> {
+    // Connect to the database or create it if it doesn't exist
+    // This database is used to track the upload progress of multi-part uploads
+    // and to store the upload metadata to potentially resume the upload later
+    // if something goes wrong
+    let pool = create_database(Some("./dvcli_direct_upload.db".to_string()))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Cleanup before starting the upload
+    cleanup_expired_and_complete_uploads(&pool).await?;
+
     let hasher = hasher.try_into()?;
+    let body = direct_upload_core(client, &id, file, hasher, body, callbacks, &pool).await?;
+    let response = register_file(client, id, body).await?;
+
+    // Cleanup after the upload
+    cleanup_expired_and_complete_uploads(&pool).await?;
+
+    Ok(response)
+}
+
+/// Uploads a batch of files directly to a Dataverse dataset using the direct upload API.
+///
+/// This function handles the complete direct upload process for a batch of files.
+/// It processes each file in the batch individually and accumulates the results.
+/// A semaphore is used to limit concurrent uploads to 5 files at a time.
+///
+/// # Arguments
+///
+/// * `client` - The base client used for API communication
+/// * `id` - The identifier of the dataset to upload the files to
+/// * `files` - A vector of files to upload
+/// * `hasher` - The hasher to use for the uploads
+/// * `body` - A vector of upload metadata for each file
+///
+/// # Returns
+///
+/// A `Result` containing either:
+/// * `()` - Indicates successful batch upload
+/// * `String` - An error message if the upload failed
+pub async fn batch_direct_upload(
+    client: &BaseClient,
+    id: Identifier,
+    files: Vec<impl Into<UploadFile>>,
+    hasher: impl TryInto<FileHash, Error = String>,
+    body: Vec<DirectUploadBody>,
+    n_parallel_uploads: impl Into<Option<usize>>,
+) -> Result<Response<BatchDirectUploadResponse>, String> {
+    // Connect to the database or create it if it doesn't exist
+    // This database is used to track the upload progress of multi-part uploads
+    // and to store the upload metadata to potentially resume the upload later
+    // if something goes wrong
+    let pool = create_database(Some("./dvcli_direct_upload.db".to_string()))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Cleanup before starting the upload
+    cleanup_expired_and_complete_uploads(&pool).await?;
+
+    // Check if the number of files matches the number of body entries
+    if files.len() != body.len() {
+        return Err("Number of files does not match number of body entries".to_string());
+    }
+
+    // Create a semaphore to limit concurrent uploads to 5
+    let semaphore = Arc::new(Semaphore::new(n_parallel_uploads.into().unwrap_or(1)));
+    let pool = Arc::new(pool.clone());
+    let client = Arc::new(client.clone());
+    let arc_id = Arc::new(id.clone());
+    let hasher = hasher.try_into()?;
+
+    // Create a vector to hold the join handles
+    let mut handles = Vec::new();
+
+    // Iterate through files and bodies together
+    for (_, (file, body)) in files.into_iter().zip(body.into_iter()).enumerate() {
+        let file = file.into();
+        let semaphore_clone = semaphore.clone();
+        let pool_clone = pool.clone();
+        let client_clone = client.clone();
+        let id_clone = arc_id.clone();
+        let hasher_clone = hasher.clone();
+
+        // Spawn a task for each file upload
+        let handle = tokio::spawn(async move {
+            let _permit = semaphore_clone.acquire().await.unwrap();
+
+            // Upload the file
+            let updated_body = direct_upload_core(
+                &client_clone,
+                &id_clone,
+                file,
+                hasher_clone,
+                body,
+                None,
+                &pool_clone,
+            )
+            .await?;
+
+            Ok::<_, String>(updated_body)
+        });
+
+        handles.push(handle);
+    }
+
+    // Wait for all uploads to complete and collect any errors
+    let mut errors = Vec::new();
+    let mut bodies = Vec::new();
+    for (idx, handle) in handles.into_iter().enumerate() {
+        match handle.await {
+            Ok(Ok(body)) => bodies.push(body),
+            Ok(Err(e)) => errors.push(format!("Error uploading file {}: {}", idx + 1, e)),
+            Err(e) => errors.push(format!("Task error for file {}: {}", idx + 1, e)),
+        }
+    }
+
+    if !errors.is_empty() {
+        return Err(format!("Batch upload had errors:\n{}", errors.join("\n")));
+    }
+
+    // Cleanup the upload
+    cleanup_expired_and_complete_uploads(&pool).await?;
+
+    // Register the files
+    register_batch_files(&client, &id, BatchDirectUploadBody::from(bodies)).await
+}
+
+/// Core logic for the direct upload process.
+///
+/// We need to separate this from the main function because we need to return
+/// the body with the hash and storage identifier to the caller. This is because
+/// we either have a single or batch upload, where different function to register
+/// the file are used.
+///
+/// # Arguments
+///
+/// * `client` - The base client used for API communication
+/// * `id` - Dataset identifier (either persistent ID or database ID)
+/// * `file` - The file to be uploaded
+/// * `hasher` - The hash algorithm to use for file integrity verification
+/// * `body` - Upload metadata including file name, description, etc.
+/// * `callbacks` - Optional vector of callback functions for progress tracking
+/// * `pool` - The database pool
+///
+/// # Returns
+///
+/// A `Result` containing either:
+/// * `DirectUploadBody` - The body with the hash and storage identifier
+/// * `String` - An error message if the upload failed
+async fn direct_upload_core(
+    client: &BaseClient,
+    id: &Identifier,
+    file: impl Into<UploadFile>,
+    hasher: FileHash,
+    body: DirectUploadBody,
+    callbacks: Option<Vec<CallbackFun>>,
+    pool: &Pool<Sqlite>,
+) -> Result<DirectUploadBody, String> {
     let mut body = body;
     let file = file.into();
+
+    // Cleanup expired and complete uploads
+    cleanup_expired_and_complete_uploads(&pool).await?;
+
+    if file.file.is_path() {
+        // Get the unique hash identifier for the upload to check if it already exists
+        // This one should not be confused with the file hash, which is computed during the upload
+        // and is used to verify the integrity of the uploaded file.
+        let file_hash_id = Upload::create_hash(
+            client.base_url().to_string(),
+            file.file.path_ref().unwrap().to_string_lossy().to_string(),
+            id.to_string(),
+            file.size as i64,
+            hasher.algorithm(),
+        );
+
+        if let Ok(upload) = Upload::get_by_hash(&pool, &file_hash_id).await {
+            // In this case, the upload already exists, so we need to upload the remaining parts
+            // Please note, this is only applicable for multi-part uploads.
+            upload_remaining_parts(client, &pool, &upload, callbacks).await?;
+            panic!("Upload already exists");
+        }
+    }
+
     // Fetch tickets
     let ticket_response = get_ticket(client, file.size as usize, id.clone())
         .await?
         .data
         .ok_or("No ticket data")?;
 
-    match ticket_response {
+    let (file_hash, file_hash_algo) = match ticket_response {
         TicketResponse::SinglePartTicket(ticket) => {
-            upload_single_part(client, &ticket, file, &hasher, callbacks).await?;
+            let file_hash = upload_single_part(client, &ticket, file, &hasher, callbacks).await?;
             body.storage_identifier = Some(ticket.storage_identifier);
+            file_hash
         }
         TicketResponse::MultiPartTicket(ticket) => {
-            upload_multi_part(client, &ticket, file, &hasher, callbacks).await?;
+            // Currently, only local files are supported for direct upload
+            // This is because currently, direct uploads require a known file size
+            // and other file sources may not provide this information.
+            if file.file.is_not_path() {
+                return Err(
+                    "Unsupported file source. Only local files are supported for direct upload."
+                        .to_string(),
+                );
+            }
+
+            let file_hash =
+                upload_multi_part(client, &pool, &id, &ticket, file, callbacks, &hasher).await?;
             body.storage_identifier = Some(ticket.storage_identifier.clone());
+            file_hash
         }
-    }
+    };
 
     // Add the hash to the body
-    hasher.add_to_payload(&mut body).unwrap();
+    add_checksum(&mut body, &file_hash_algo, file_hash).map_err(|e| e.to_string())?;
 
-    register_file(client, id, body).await
+    Ok(body)
 }
 
 /// Uploads a file in a single request using the provided ticket information.
@@ -119,7 +335,7 @@ async fn upload_single_part(
     file: UploadFile,
     hasher: &FileHash,
     callbacks: Option<Vec<CallbackFun>>,
-) -> Result<(), String> {
+) -> Result<(String, String), String> {
     // Create a vector of callbacks, if provided, else just the hasher
     let mut callback_vec = vec![hasher.to_callback()];
     if let Some(cbs) = callbacks {
@@ -144,7 +360,10 @@ async fn upload_single_part(
         .map_err(|e| e.to_string())?;
 
     if response.status().is_success() {
-        Ok(())
+        Ok((
+            hasher.compute().map_err(|e| e.to_string())?,
+            hasher.algorithm().to_string(),
+        ))
     } else {
         Err(response.text().await.unwrap_or_default())
     }
@@ -171,113 +390,154 @@ async fn upload_single_part(
 /// * `String` - An error message if the upload failed
 async fn upload_multi_part(
     client: &BaseClient,
+    pool: &Pool<Sqlite>,
+    id: &Identifier,
     ticket: &MultiPartTicket,
     file: UploadFile,
-    hasher: &FileHash,
     callbacks: Option<Vec<CallbackFun>>,
-) -> Result<(), String> {
-    // Merge callbacks and hasher
-    let callbacks = if let Some(mut cbs) = callbacks {
-        cbs.push(hasher.to_callback());
-        Some(cbs)
-    } else {
-        Some(vec![hasher.to_callback()])
-    };
+    hasher: &FileHash,
+) -> Result<(String, String), String> {
+    // Create the upload in the database
+    let upload = Upload::from_ticket(
+        &pool,
+        ticket,
+        client.base_url().as_str(),
+        id,
+        &PathBuf::from(file.file.path_ref().unwrap()),
+        file.size,
+        hasher.algorithm(),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
-    // Sort the URLs by part number
-    let urls = sort_urls_by_part_number(&ticket.urls);
+    // Upload the remaining parts
+    let hash_task = hash_and_store(&upload, &pool, &hasher, file);
+    let upload_task = upload_remaining_parts(client, &pool, &upload, callbacks);
 
-    // Chunk the file and prepare for upload
-    let chunked_files = file
-        .chunk_file(ticket.part_size as u64)
+    let (_, _) = tokio::join!(hash_task, upload_task);
+
+    // Refetch the upload to get the file hash
+    let upload = Upload::get_by_hash(&pool, &upload.hash)
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut e_tags = HashMap::new();
-
-    // Upload each chunk
-    for (file, (part_number, url)) in chunked_files.into_iter().zip(urls) {
-        let tag = match upload_chunk(client, &url, file, callbacks.clone()).await {
-            Ok(tag) => tag,
-            Err(e) => {
-                abort_upload(client, &ticket.abort).await?;
-                return Err(e);
-            }
-        };
-
-        e_tags.insert(part_number, tag);
-    }
-
-    // Complete the upload
-    complete_upload(client, &ticket.complete, e_tags).await?;
-
-    Ok(())
+    Ok((
+        upload.file_hash.ok_or("No file hash found")?,
+        upload.file_hash_algo,
+    ))
 }
 
-/// Sorts the URLs by part number.
+/// Uploads the remaining parts of a file.
 ///
-/// This function is used to ensure that the parts are uploaded in the correct order.
-///
-/// # Arguments
-///
-/// * `urls` - A `HashMap` of part numbers and URLs
-///
-/// # Returns
-///
-/// A vector of tuples containing the part number and the corresponding URL
-fn sort_urls_by_part_number(urls: &HashMap<String, String>) -> Vec<(String, String)> {
-    urls.clone()
-        .into_iter()
-        .map(|(part_number, url)| (part_number, url))
-        .collect::<Vec<_>>()
-        .into_iter()
-        .sorted_by(|(a, _), (b, _)| a.cmp(b))
-        .collect()
-}
-
-/// Uploads a chunk of a file to the server.
-///
-/// This function uploads a chunk of a file to the server and returns the ETag
-/// of the uploaded chunk.
+/// This function uploads the parts of a file that have not yet been uploaded.
+/// It uses a semaphore to limit the number of concurrent uploads and a database
+/// to track the upload progress.
 ///
 /// # Arguments
 ///
 /// * `client` - The base client used for API communication
-/// * `url` - The URL to upload the chunk to
+/// * `pool` - The database pool
+/// * `upload` - The upload to upload the parts for
+/// * `hasher` - The hasher to use for the upload
 /// * `file` - The file to upload
-/// * `callbacks` - Optional vector of callback functions for progress tracking
+/// * `callbacks` - The callbacks to use for the upload
 ///
 /// # Returns
 ///
 /// A `Result` containing either:
-/// * `String` - The ETag of the uploaded chunk
+/// * `()` - Indicates successful upload
 /// * `String` - An error message if the upload failed
-async fn upload_chunk(
+async fn upload_remaining_parts(
     client: &BaseClient,
-    url: &str,
-    file: UploadFile,
+    pool: &Pool<Sqlite>,
+    upload: &Upload,
     callbacks: Option<Vec<CallbackFun>>,
-) -> Result<String, String> {
-    // Ensure we don't close the file handle prematurely
-    let context = RequestType::File { file, callbacks };
-    let url = TestMode::from_str(&std::env::var("TEST_MODE").unwrap_or_default())
-        .unwrap_or(TestMode::Off)
-        .process_url(url);
+) -> Result<(), String> {
+    // Get all open parts
+    let open_parts = upload
+        .get_parts(&pool, true)
+        .await
+        .map_err(|e| e.to_string())?;
 
-    let response = client.put(&url, None, context, None).await;
+    // Create a semaphore to limit concurrent uploads to 3
+    let semaphore = Arc::new(Semaphore::new(3));
+    let pool = Arc::new(pool.clone());
+    let client = Arc::new(client.clone());
 
-    match response {
-        Err(e) => Err(e.to_string()),
-        Ok(response) => {
-            let headers = response.headers().clone();
-            headers
-                .get("ETag")
-                .ok_or("No ETag header")?
-                .to_str()
-                .map_err(|e| e.to_string())
-                .map(String::from)
-        }
+    // Create a vector to hold the join handles
+    let mut handles = Vec::new();
+
+    // Upload each part in parallel with semaphore limiting concurrency
+    for part in open_parts {
+        let semaphore_clone = semaphore.clone();
+        let pool_clone = pool.clone();
+        let client_clone = client.clone();
+        let callbacks_clone = callbacks.clone();
+
+        // Spawn a task for each part upload
+        let handle = tokio::spawn(async move {
+            // Acquire a permit from the semaphore (will wait if 3 are already in use)
+            let _permit = semaphore_clone.acquire().await.unwrap();
+
+            // Upload the part
+            let etag = part.upload_part(&client_clone, callbacks_clone).await?;
+
+            // Update the part as complete in the DB
+            part.update_part_as_complete(etag, &pool_clone)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            Ok::<_, String>(())
+        });
+
+        handles.push(handle);
     }
+
+    // Wait for all uploads to complete
+    for handle in handles {
+        handle.await.map_err(|e| e.to_string())??;
+    }
+
+    // Collect the ETags
+    let (e_tags, complete_url) = upload
+        .collect_etags(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Complete the upload
+    complete_upload(&client, &complete_url, e_tags).await?;
+
+    Ok(())
+}
+
+/// Hashes the file and stores the hash in the database.
+///
+/// This function hashes the file and stores the hash in the database.
+///
+/// # Arguments
+///
+/// * `upload` - The upload to store the hash for
+async fn hash_and_store(
+    upload: &Upload,
+    pool: &Pool<Sqlite>,
+    hasher: &FileHash,
+    file: UploadFile,
+) -> Result<(), String> {
+    if upload.file_hash.is_some() {
+        return Ok(());
+    }
+
+    // Hash the file
+    hasher.hash(file).await?;
+    let hash_string = hasher.compute().map_err(|e| e.to_string())?;
+
+    // Store the file hash in the database
+    upload
+        .set_file_hash(hash_string, hasher.algorithm(), pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 /// Completes the upload of a file by sending the ETags to the server.
@@ -318,30 +578,6 @@ async fn complete_upload(
         println!("Complete upload failed ({}): {}", status, text);
         Err(text)
     }
-}
-
-/// Aborts the upload of a file by sending a DELETE request to the server.
-///
-/// This function sends a DELETE request to the server to abort the upload
-/// process. It is used to clean up any resources associated with the upload
-/// if it fails or is interrupted.
-///
-/// # Arguments
-///
-/// * `client` - The base client used for API communication
-/// * `abort_url` - The URL to abort the upload
-///
-/// # Returns
-///
-/// A `Result` containing either:
-/// * `()` - Indicates successful abort
-/// * `String` - An error message if the abort failed
-async fn abort_upload(client: &BaseClient, abort_url: &str) -> Result<(), String> {
-    client
-        .delete(&abort_url, None, RequestType::Plain, None)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(())
 }
 
 /// Registers an uploaded file with the dataset in Dataverse.
@@ -394,6 +630,36 @@ async fn register_file(
     evaluate_response::<DirectUploadResponse>(response).await
 }
 
+async fn register_batch_files(
+    client: &BaseClient,
+    id: &Identifier,
+    body: impl Into<BatchDirectUploadBody>,
+) -> Result<Response<BatchDirectUploadResponse>, String> {
+    // Check if the dataset has any locks and wait until they are released
+    check_lock!(client, &id);
+
+    let path = match id {
+        Identifier::PersistentId(pid) => {
+            format!("api/datasets/:persistentId/addFiles?persistentId={}", pid)
+        }
+        Identifier::Id(id) => format!("api/datasets/{}/addFiles", id),
+    };
+
+    let body = assemble_upload_body(Some(body.into()));
+
+    let context = RequestType::Multipart {
+        bodies: body,
+        files: None,
+        callbacks: None,
+    };
+
+    let response = client
+        .post(path.as_str(), None, context, Some(tagged_headers()))
+        .await;
+
+    evaluate_response::<BatchDirectUploadResponse>(response).await
+}
+
 /// Creates a header map with the `x-amz-tagging` header set to `dv-state=temp`.
 ///
 /// This function returns a new `HeaderMap` with the `x-amz-tagging` header
@@ -408,6 +674,29 @@ fn tagged_headers() -> HeaderMap {
     headers.insert("x-amz-tagging", HeaderValue::from_static("dv-state=temp"));
 
     headers
+}
+
+/// Cleans up expired uploads from the database.
+///
+/// Uploads that are at least expired 1 day are deleted. This is to prevent
+/// the database from growing too much. This is called when direct upload
+/// is started and when the upload is complete.
+///
+/// # Arguments
+///
+/// * `pool` - The database pool
+///
+/// # Returns
+///
+/// A `Result` containing either:
+/// * `()` - Indicates successful cleanup
+async fn cleanup_expired_and_complete_uploads(pool: &Pool<Sqlite>) -> Result<(), String> {
+    let expiration_time = Utc::now().naive_utc() - Duration::days(1);
+    Upload::delete_expired(&pool, Some(expiration_time))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 /// This enum is used to determine the test mode for the upload.
@@ -439,7 +728,7 @@ impl TestMode {
     /// # Returns
     ///
     /// The processed URL as a String
-    fn process_url(&self, url: &str) -> String {
+    pub(crate) fn process_url(&self, url: &str) -> String {
         match self {
             TestMode::LocalStack => {
                 let replaced = url.replace("localstack", "localhost");
@@ -476,9 +765,8 @@ impl FromStr for TestMode {
 mod tests {
     use std::path::PathBuf;
 
-    use tempfile::NamedTempFile;
-
     use crate::{
+        direct_upload::model::Part,
         prelude::dataset::get_dataset_meta,
         test_utils::{
             create_test_collection, create_test_dataset, extract_test_env, set_storage_backend,
@@ -628,16 +916,19 @@ mod tests {
 
         // Mock a file with the specified size
         let data = vec![0; size];
-        let temp_file = NamedTempFile::new().expect("Failed to create temp file");
-        std::fs::write(temp_file.path(), &data).expect("Failed to write data to temp file");
 
-        let expected_hash = format!(
-            "{:x}",
-            md5::compute(std::fs::read(temp_file.path()).unwrap())
-        );
+        // Create directory if it doesn't exist
+        std::fs::create_dir_all("tests/fixtures")
+            .expect("Failed to create tests/fixtures directory");
+
+        // Write test data to the file
+        let file_path = PathBuf::from("tests/fixtures/direct_upload.txt");
+        std::fs::write(&file_path, &data).expect("Failed to write data to test file");
+
+        let expected_hash = format!("{:x}", md5::compute(std::fs::read(&file_path).unwrap()));
 
         let body = DirectUploadBody {
-            file_name: Some("large_test_file.bin".to_string()),
+            file_name: Some("direct_upload.txt".to_string()),
             mime_type: Some("text/plain".to_string()),
             ..Default::default()
         };
@@ -647,7 +938,7 @@ mod tests {
         direct_upload(
             &client,
             Identifier::PersistentId(pid.clone()),
-            temp_file.path().to_path_buf(),
+            file_path,
             "MD5",
             body,
             None,
@@ -677,5 +968,208 @@ mod tests {
             &expected_hash,
             "File checksum does not match expected value"
         );
+    }
+
+    #[tokio::test]
+    async fn test_batch_upload() {
+        // ARRANGE
+        // Set up test environment and client
+        let (client, pid) = setup_direct_upload("LocalStack").await;
+        set_test_mode("LocalStack");
+
+        // Get the size from env variable
+        // Default to 30MB if not specified, otherwise use the specified size
+        let size = std::env::var("DVCLI_TEST_MULTIPART_SIZE")
+            .unwrap_or("30000000".to_string()) // 30MB if not specified
+            .parse::<usize>()
+            .expect("Failed to parse multipart test size");
+
+        // Mock a file with the specified size
+        let data = vec![0; size];
+
+        // Create directory if it doesn't exist
+        std::fs::create_dir_all("tests/fixtures")
+            .expect("Failed to create tests/fixtures directory");
+
+        // Write test data to the file
+        let file1_path = PathBuf::from("tests/fixtures/direct_upload.txt");
+        std::fs::write(&file1_path, &data).expect("Failed to write data to test file");
+
+        let file2_path = PathBuf::from("tests/fixtures/direct_upload2.txt");
+        std::fs::write(&file2_path, &data).expect("Failed to write data to test file");
+
+        let expected_hash1 = format!("{:x}", md5::compute(std::fs::read(&file1_path).unwrap()));
+        let expected_hash2 = format!("{:x}", md5::compute(std::fs::read(&file2_path).unwrap()));
+        let body1 = DirectUploadBody {
+            file_name: Some("direct_upload.txt".to_string()),
+            mime_type: Some("text/plain".to_string()),
+            ..Default::default()
+        };
+        let body2 = DirectUploadBody {
+            file_name: Some("direct_upload2.txt".to_string()),
+            mime_type: Some("text/plain".to_string()),
+            ..Default::default()
+        };
+
+        // ACT
+        // Perform the multi-part upload
+        let response = batch_direct_upload(
+            &client,
+            Identifier::PersistentId(pid.clone()),
+            vec![file1_path, file2_path],
+            "MD5",
+            vec![body1, body2],
+            2,
+        )
+        .await
+        .expect("Failed to upload file");
+
+        assert!(response.status.is_ok(), "Batch upload failed");
+
+        // ASSERT
+        // Verify file upload and checksum
+        let files = get_dataset_meta(&client, &Identifier::PersistentId(pid), &None)
+            .await
+            .expect("Failed to fetch dataset metadata");
+
+        let data = files.data.expect("No dataset data returned");
+        assert_eq!(
+            data.files.len(),
+            2,
+            "Expected exactly two files in the dataset"
+        );
+
+        let expected_hashes = vec![expected_hash1, expected_hash2];
+
+        for (file, expected_hash) in data.files.iter().zip(expected_hashes.iter()) {
+            let data_file = file.data_file.as_ref().expect("No data file present");
+            let checksum = data_file.checksum.as_ref().expect("No checksum present");
+
+            assert_eq!(
+                checksum.value.as_ref().expect("No checksum value"),
+                expected_hash,
+                "File checksum does not match expected value"
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn test_duplicate_batch_upload() {
+        // ARRANGE
+        // Set up test environment and client
+        let (client, pid) = setup_direct_upload("LocalStack").await;
+        set_test_mode("LocalStack");
+
+        // Get the size from env variable
+        // Default to 30MB if not specified, otherwise use the specified size
+        let size = std::env::var("DVCLI_TEST_MULTIPART_SIZE")
+            .unwrap_or("30000000".to_string()) // 30MB if not specified
+            .parse::<usize>()
+            .expect("Failed to parse multipart test size");
+
+        // Mock a file with the specified size
+        let data = vec![0; size];
+
+        // Create directory if it doesn't exist
+        std::fs::create_dir_all("tests/fixtures")
+            .expect("Failed to create tests/fixtures directory");
+
+        // Write test data to the file
+        let file1_path = PathBuf::from("tests/fixtures/direct_upload.txt");
+        std::fs::write(&file1_path, &data).expect("Failed to write data to test file");
+
+        let file2_path = PathBuf::from("tests/fixtures/direct_upload.txt");
+        std::fs::write(&file2_path, &data).expect("Failed to write data to test file");
+
+        let body1 = DirectUploadBody {
+            file_name: Some("direct_upload.txt".to_string()),
+            mime_type: Some("text/plain".to_string()),
+            ..Default::default()
+        };
+        let body2 = DirectUploadBody {
+            file_name: Some("direct_upload.txt".to_string()),
+            mime_type: Some("text/plain".to_string()),
+            ..Default::default()
+        };
+
+        // ACT
+        // Perform the multi-part upload
+        batch_direct_upload(
+            &client,
+            Identifier::PersistentId(pid.clone()),
+            vec![file1_path, file2_path],
+            "MD5",
+            vec![body1, body2],
+            2,
+        )
+        .await
+        .expect("Failed to upload file");
+    }
+
+    #[tokio::test]
+    async fn test_hash_file() {
+        // ARRANGE
+        let test_file_path = PathBuf::from("tests/fixtures/file.txt");
+        let upload_file = UploadFile::from_path(test_file_path.clone())
+            .await
+            .expect("Failed to create upload file");
+
+        let pool = setup_db().await;
+
+        // Create a test upload record
+        let upload = Upload::new(
+            "https://example.com",
+            "storage_id",
+            "1234567890",
+            test_file_path.to_str().unwrap(),
+            "https://example.com/complete",
+            "https://example.com/abort",
+            100,
+            10,
+            "MD5",
+        );
+
+        // Insert the upload record without any parts
+        Upload::insert(&pool, &upload, Vec::<Part>::new())
+            .await
+            .expect("Failed to insert upload record");
+
+        // ACT
+        let hasher = FileHash::new("MD5").expect("Failed to create MD5 hasher");
+        hash_and_store(&upload, &pool, &hasher, upload_file)
+            .await
+            .expect("Failed to hash and store file");
+
+        // ASSERT
+        // Calculate expected hash directly from file contents
+        let file_contents = std::fs::read(&test_file_path).expect("Failed to read test file");
+        let expected_hash = format!("{:x}", md5::compute(file_contents));
+
+        // Retrieve the updated upload record and verify the hash
+        let updated_upload = Upload::get_by_hash(&pool, &upload.hash)
+            .await
+            .expect("Failed to retrieve upload record");
+
+        assert_eq!(
+            updated_upload.file_hash.expect("No file hash found"),
+            expected_hash,
+            "Stored file hash doesn't match expected value"
+        );
+    }
+
+    /// Helper function to set up a test database.
+    ///
+    /// # Returns
+    /// * A `sqlx::Pool<sqlx::Sqlite>` - The test database pool
+    async fn setup_db() -> sqlx::Pool<sqlx::Sqlite> {
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        Upload::create_table(&pool)
+            .await
+            .expect("Failed to create table");
+        Part::create_table(&pool)
+            .await
+            .expect("Failed to create table");
+        pool
     }
 }
