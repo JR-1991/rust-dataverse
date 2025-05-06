@@ -44,6 +44,7 @@ variantly = "0.4.0"
 lazy_static = "1.4.0"
 sqlx = { version = "0.8.4", features = ["runtime-tokio-native-tls", "sqlite"] }
 dirs = "6.0.0"
+libdbus-sys = { version = "0.2.5", features = ["vendored"] }
 
 [[bin]]
 name = "dvcli"
