@@ -93,9 +93,7 @@ pub async fn direct_upload(
     // This database is used to track the upload progress of multi-part uploads
     // and to store the upload metadata to potentially resume the upload later
     // if something goes wrong
-    let pool = create_database(Some("./dvcli_direct_upload.db".to_string()))
-        .await
-        .map_err(|e| e.to_string())?;
+    let pool = create_database(None).await.map_err(|e| e.to_string())?;
 
     // Cleanup before starting the upload
     cleanup_expired_and_complete_uploads(&pool).await?;
@@ -141,9 +139,7 @@ pub async fn batch_direct_upload(
     // This database is used to track the upload progress of multi-part uploads
     // and to store the upload metadata to potentially resume the upload later
     // if something goes wrong
-    let pool = create_database(Some("./dvcli_direct_upload.db".to_string()))
-        .await
-        .map_err(|e| e.to_string())?;
+    let pool = create_database(None).await.map_err(|e| e.to_string())?;
 
     // Cleanup before starting the upload
     cleanup_expired_and_complete_uploads(&pool).await?;
