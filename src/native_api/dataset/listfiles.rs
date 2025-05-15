@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::data_access::datafile::full_file_path;
 use crate::prelude::dataset::get_dataset_meta;
 use crate::prelude::{BaseClient, DatasetVersion, Identifier};
-use crate::response::{Message, Status};
+use crate::response::{Message, Response, Status};
 
 use super::edit::File;
 
@@ -38,7 +40,7 @@ pub async fn list_dataset_files(
     client: &BaseClient,
     id: &Identifier,
     version: &Option<DatasetVersion>,
-) -> Result<HashMap<String, File>, String> {
+) -> Result<Response<ListFilesResponse>, String> {
     // Fetch metadata
     let response = get_dataset_meta(client, id, version)
         .await
@@ -58,14 +60,23 @@ pub async fn list_dataset_files(
         .ok_or("No data found in dataset metadata".to_string())?
         .files;
 
-    Ok(files
+    let files = files
         .iter()
         .map(|file| {
             let complete_path = full_file_path(file.clone());
             (complete_path, file.clone())
         })
-        .collect())
+        .collect();
+
+    Ok(Response::<ListFilesResponse>::new(
+        Status::OK,
+        Some(ListFilesResponse(files)),
+        Some(Message::PlainMessage("Files listed".to_string())),
+    ))
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListFilesResponse(pub HashMap<String, File>);
 
 #[cfg(test)]
 mod tests {
@@ -103,7 +114,8 @@ mod tests {
             .expect("Failed to list dataset files");
 
         // Assert
-        assert_eq!(result.len(), 1);
-        assert_eq!(result.keys().next().unwrap(), "test/file.txt");
+        let files = result.data.unwrap().0;
+        assert_eq!(files.len(), 1);
+        assert_eq!(files.keys().next().unwrap(), "test/file.txt");
     }
 }

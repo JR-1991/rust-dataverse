@@ -32,12 +32,15 @@ pub mod macros;
 
 /// File handling functionality
 pub mod file {
+    pub use mime::infer_mime;
     pub use uploadfile::UploadFile;
 
     /// Callback functionality for file operations
     pub mod callback;
     /// File streaming utilities
     pub(crate) mod filestream;
+    /// MIME type inference
+    pub(crate) mod mime;
     /// File upload functionality
     pub(crate) mod uploadfile;
     /// ZIP file streaming utilities
@@ -65,7 +68,9 @@ pub mod search_api {
 
 /// Direct upload functionality
 pub mod direct_upload {
+    pub use upload::batch_direct_upload;
     pub use upload::direct_upload;
+
     /// Database operations
     mod db;
     /// Hasher functionality

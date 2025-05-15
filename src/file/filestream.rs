@@ -137,14 +137,14 @@ mod tests {
     #[tokio::test]
     async fn test_open_new_file() {
         let path = Path::new("tests/fixtures/file.txt");
-        let file = super::open_file(None, &path).await.unwrap();
+        let file = super::open_file(None, path).await.unwrap();
         assert!(file.metadata().await.is_ok());
     }
 
     #[tokio::test]
     async fn test_open_existing_file() {
         let path = Path::new("tests/fixtures/file.txt");
-        let file = super::open_file(10.into(), &path)
+        let file = super::open_file(Some(10), path)
             .await
             .expect("Failed to open file");
         assert!(file.metadata().await.is_ok());

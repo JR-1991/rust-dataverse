@@ -141,7 +141,7 @@ pub(crate) async fn run_zip_writer(dir_path: PathBuf, tx: Sender<Vec<u8>>) -> Re
     let method = Compression::Deflate;
 
     // Walk recursively through a directory and write all files to the zip
-    for entry in WalkDir::new(dir_path).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(&dir_path).into_iter().filter_map(|e| e.ok()) {
         let is_dir = entry.file_type().is_dir();
         let has_hidden = contains_hidden(entry.path());
 
@@ -149,7 +149,7 @@ pub(crate) async fn run_zip_writer(dir_path: PathBuf, tx: Sender<Vec<u8>>) -> Re
             continue;
         }
 
-        stream_file_to_archive(&mut writer, entry.path().to_owned(), method)
+        stream_file_to_archive(&mut writer, entry.path().to_owned(), method, &dir_path)
             .await
             .map_err(|e| e.to_string())?;
     }
@@ -176,9 +176,14 @@ async fn stream_file_to_archive(
     writer: &mut ZipFileWriter<&mut ZipStream>,
     file_path: PathBuf,
     method: Compression,
+    dir_path: &PathBuf,
 ) -> Result<(), Box<dyn Error>> {
     let data = read_file(file_path.clone()).await?;
-    let zip_path = ZipString::from(file_path.to_string_lossy().as_ref());
+
+    // Remove the current pwd from the path
+    let path: PathBuf = file_path.strip_prefix(dir_path).unwrap().to_owned();
+
+    let zip_path = ZipString::from(path.to_string_lossy().as_ref());
     let builder = ZipEntryBuilder::new(zip_path, method);
 
     writer

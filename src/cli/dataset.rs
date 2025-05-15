@@ -17,11 +17,11 @@ use structopt::StructOpt;
 use tokio::runtime::Runtime;
 
 use crate::client::{print_error, BaseClient};
-use crate::data_access;
 use crate::data_access::datafile::DataFilePath;
 use crate::datasetversion::DatasetVersion;
+use crate::direct_upload::upload::DirectUploadBody;
 use crate::file::uploadfile::FileSource;
-use crate::file::UploadFile;
+use crate::file::{infer_mime, UploadFile};
 use crate::identifier::Identifier;
 use crate::native_api::dataset;
 use crate::native_api::dataset::create::{self, DatasetCreateBody};
@@ -36,6 +36,7 @@ use crate::prelude::dataset::locks::LockType;
 use crate::prelude::dataset::upload::file_exists_at_dataset;
 use crate::prelude::dataset::{dirupload, size};
 use crate::prelude::file;
+use crate::{data_access, direct_upload};
 
 use super::base::{evaluate_and_print_response, parse_file, Matcher};
 
@@ -146,8 +147,19 @@ pub enum DatasetSubCommand {
     /// Upload a file to a dataset using direct upload
     #[structopt(about = "Upload a file to a dataset using direct upload")]
     DirectUpload {
+        #[structopt(long, short, help = "Identifier of the dataset to upload the file to")]
+        id: Identifier,
+
         #[structopt(help = "Path to the file to upload")]
-        path: PathBuf,
+        paths: Vec<PathBuf>,
+
+        #[structopt(
+            long,
+            short,
+            help = "Number of files to upload in parallel",
+            default_value = "3"
+        )]
+        parallel: usize,
     },
 
     /// Download files from a dataset
@@ -356,12 +368,25 @@ impl Matcher for DatasetSubCommand {
             DatasetSubCommand::ListFiles { id, version } => {
                 let response = runtime.block_on(dataset::list_dataset_files(client, &id, &version));
 
-                if let Err(e) = response {
-                    eprintln!("Error: {}", e);
-                }
+                evaluate_and_print_response(response);
             }
-            DatasetSubCommand::DirectUpload { path: _ } => {
-                println!("Direct upload not implemented yet.");
+            DatasetSubCommand::DirectUpload {
+                id,
+                paths,
+                parallel,
+            } => {
+                // We are currently using the default body for direct upload.
+                // TODO: Allow custom bodies for future versions of the CLI
+                let bodies = paths
+                    .iter()
+                    .map(Self::create_direct_upload_body)
+                    .collect::<Result<Vec<_>, _>>()
+                    .expect("Failed to create direct upload bodies");
+
+                let response = runtime.block_on(direct_upload::batch_direct_upload(
+                    client, id, paths, "MD5", bodies, parallel,
+                ));
+                evaluate_and_print_response(response);
             }
             DatasetSubCommand::Download {
                 id,
@@ -428,15 +453,12 @@ impl Matcher for DatasetSubCommand {
                         evaluate_and_print_response(response);
                     } else {
                         eprintln!("Error: Lock type is required when setting a lock. Please provide a lock type with '-t' or '--type'.");
-                        return;
                     }
                 } else if remove {
-                    let response =
-                        runtime.block_on(dataset::remove_lock(client, &id, lock_type.clone()));
+                    let response = runtime.block_on(dataset::remove_lock(client, &id, lock_type));
                     evaluate_and_print_response(response);
                 } else {
-                    let response =
-                        runtime.block_on(dataset::get_locks(client, &id, lock_type.clone()));
+                    let response = runtime.block_on(dataset::get_locks(client, &id, lock_type));
                     evaluate_and_print_response(response);
                 }
             }
@@ -469,7 +491,7 @@ impl DatasetSubCommand {
         let body = match (body, dv_path) {
             (Some(mut upload_body), Some(path)) => {
                 // If we have both body and dv_path, update the body with directory and filename
-                let dir = path.parent().unwrap_or(&Path::new("")).to_str().unwrap();
+                let dir = path.parent().unwrap_or(Path::new("")).to_str().unwrap();
                 let name = path.file_name().unwrap().to_str().unwrap();
 
                 upload_body.directory_label = Some(dir.to_string());
@@ -478,12 +500,15 @@ impl DatasetSubCommand {
             }
             (None, Some(path)) => {
                 // If we only have dv_path but no body, create a new default body
-                let dir = path.parent().unwrap_or(&Path::new("")).to_str().unwrap();
+                let dir = path.parent().unwrap_or(Path::new("")).to_str().unwrap();
                 let name = path.file_name().unwrap().to_str().unwrap();
 
-                let mut upload_body = UploadBody::default();
-                upload_body.directory_label = Some(dir.to_string());
-                upload_body.filename = Some(name.to_string());
+                let upload_body = UploadBody {
+                    directory_label: Some(dir.to_string()),
+                    filename: Some(name.to_string()),
+                    ..Default::default()
+                };
+
                 Some(upload_body)
             }
             (body, None) => body, // No dv_path, just return the original body (or None)
@@ -513,7 +538,7 @@ impl DatasetSubCommand {
         version: Option<DatasetVersion>,
         file: &PathBuf,
     ) -> Result<(bool, bool, Option<i64>), Box<dyn Error>> {
-        let response = runtime.block_on(file_exists_at_dataset(client, &id, file, version));
+        let response = runtime.block_on(file_exists_at_dataset(client, id, file, version));
 
         response
     }
@@ -539,11 +564,9 @@ impl DatasetSubCommand {
             FileSource::Path(path) => {
                 if path.is_dir() {
                     Self::handle_directory_upload(client, runtime, id, path, body);
-                    return;
                 } else {
                     Self::process_file_upload(client, runtime, id, file, body, replace)
                         .expect("Failed to process file upload");
-                    return;
                 }
             }
             _ => Self::process_file_upload(client, runtime, id, file, body, replace)
@@ -563,7 +586,7 @@ impl DatasetSubCommand {
         client: &BaseClient,
         runtime: &Runtime,
         id: &Identifier,
-        path: &PathBuf,
+        path: &Path,
         body: Option<UploadBody>,
     ) {
         let response = runtime.block_on(dirupload::upload_directory(
@@ -598,7 +621,7 @@ impl DatasetSubCommand {
     ) -> Result<(), Box<dyn Error>> {
         let (exists, _same_hash, file_id) = match &file.file {
             FileSource::Path(path) => {
-                Self::check_file_exists(client, runtime, id, DatasetVersion::Draft.into(), &path)?
+                Self::check_file_exists(client, runtime, id, DatasetVersion::Draft.into(), path)?
             }
             _ => (false, false, None),
         };
@@ -640,5 +663,33 @@ impl DatasetSubCommand {
 
         evaluate_and_print_response(response);
         Ok(())
+    }
+
+    /// Creates a DirectUploadBody with the filename extracted from the provided path.
+    ///
+    /// This function extracts the filename from the path and sets it in the DirectUploadBody.
+    /// It handles the default values for other fields in the body.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A reference to the PathBuf containing the file path
+    ///
+    /// # Returns
+    ///
+    /// A DirectUploadBody with the filename set
+    fn create_direct_upload_body(path: &PathBuf) -> Result<DirectUploadBody, String> {
+        let filename = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(String::from)
+            .unwrap_or_default();
+
+        let mime = infer_mime(path).map_err(|e| format!("Failed to infer mime type. Direct upload only supports files with known mime types. Error: {}", e))?;
+
+        Ok(DirectUploadBody {
+            file_name: Some(filename),
+            mime_type: Some(mime),
+            ..Default::default()
+        })
     }
 }

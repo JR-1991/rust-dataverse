@@ -76,7 +76,7 @@ mod tests {
             .expect("Failed to create database");
 
         // Check if the database exists
-        assert!(Sqlite::database_exists(&db_path.to_str().unwrap())
+        assert!(Sqlite::database_exists(db_path.to_str().unwrap())
             .await
             .expect("Failed to check if database exists"));
     }

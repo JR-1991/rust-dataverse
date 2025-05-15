@@ -105,7 +105,7 @@ mod tests {
         let response = dataset::metadata::get_dataset_meta(
             &client,
             &Identifier::Id(id),
-            &Some(DatasetVersion::Draft.into()),
+            &Some(DatasetVersion::Draft),
         )
         .await
         .expect("Failed to get dataset metadata");

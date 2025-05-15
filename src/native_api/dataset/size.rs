@@ -45,7 +45,7 @@ pub async fn get_dataset_size(
     // Parse the identifier
     let id = match id {
         Identifier::Id(id) => *id,
-        Identifier::PersistentId(_) => get_dataset_id(client, &id, version.clone()).await?,
+        Identifier::PersistentId(_) => get_dataset_id(client, id, version.clone()).await?,
     };
 
     // Parse the version

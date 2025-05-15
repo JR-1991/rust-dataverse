@@ -96,11 +96,10 @@ pub async fn set_lock(
         Identifier::PersistentId(pid) => {
             format!(
                 "api/datasets/:persistentId/lock/{}?persistentId={}",
-                lock_type.to_string(),
-                pid
+                lock_type, pid
             )
         }
-        Identifier::Id(id) => format!("api/datasets/{}/lock/{}", id, lock_type.to_string()),
+        Identifier::Id(id) => format!("api/datasets/{}/lock/{}", id, lock_type),
     };
 
     // Send request

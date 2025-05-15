@@ -106,4 +106,56 @@ mod tests {
             Some("SOME_DIRECTORY_LABEL".to_string())
         );
     }
+
+    #[tokio::test]
+    async fn test_get_file_meta_by_db_id() {
+        // Arrange
+        let client = create_test_client();
+        let (id, _) = create_test_dataset(&client, "Root").await;
+
+        // Upload a file with metadata
+        let body = UploadBody {
+            categories: vec!["SOME_CATEGORY".to_string()],
+            description: Some("SOME_DESCRIPTION".to_string()),
+            directory_label: Some("SOME_DIRECTORY_LABEL".to_string()),
+            ..Default::default()
+        };
+
+        let file_response = upload_file_to_dataset(
+            &client,
+            Identifier::Id(id),
+            "tests/fixtures/file.txt",
+            Some(body),
+            None,
+        )
+        .await
+        .expect("Failed to upload file");
+
+        let files = file_response
+            .data
+            .expect("Failed to get file response")
+            .files;
+
+        let file = files.first().expect("Failed to get file");
+        let file_id = file
+            .data_file
+            .as_ref()
+            .expect("Failed to get file id")
+            .id
+            .expect("Failed to get file id");
+
+        // Act
+        let response = get_file_meta(&client, &Identifier::Id(file_id)).await;
+
+        // Assert
+        assert!(response.is_ok());
+
+        let data = response.expect("Failed to get file metadata").data.unwrap();
+        assert_eq!(data.categories, vec!["SOME_CATEGORY".to_string()]);
+        assert_eq!(data.description, Some("SOME_DESCRIPTION".to_string()));
+        assert_eq!(
+            data.directory_label,
+            Some("SOME_DIRECTORY_LABEL".to_string())
+        );
+    }
 }

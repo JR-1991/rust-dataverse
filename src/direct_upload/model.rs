@@ -39,7 +39,12 @@
 //! | is_uploaded  | BOOLEAN | Flag indicating whether the part is uploaded |
 //! | file_path    | TEXT    | File path for the part |
 
-use std::{borrow::Cow, collections::HashMap, path::PathBuf, str::FromStr};
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use chrono::{Duration, NaiveDateTime, Utc};
 use reqwest::Url;
@@ -150,6 +155,7 @@ impl Upload {
     /// # Returns
     ///
     /// A new Uploads instance with a hash generated from the base_url, path, pid, and size
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         base_url: &str,
         storage_id: &str,
@@ -230,7 +236,7 @@ impl Upload {
         ticket: &MultiPartTicket,
         base_url: &str,
         pid: &Identifier,
-        path: &PathBuf,
+        path: &Path,
         size: u64,
         file_hash_algo: &str,
     ) -> Result<Upload, sqlx::Error> {
@@ -254,11 +260,11 @@ impl Upload {
         // Insert or get the upload
         let urls = ticket
             .urls
-            .iter()
-            .map(|(_, url)| {
+            .values()
+            .map(|url| {
                 TestMode::from_str(&std::env::var("TEST_MODE").unwrap_or_default())
                     .unwrap_or(TestMode::Off)
-                    .process_url(&url);
+                    .process_url(url);
                 url.clone()
             })
             .collect();
@@ -864,7 +870,7 @@ impl FromStr for Part {
             id: 0,
             hash: "".to_string(),
             url: url.to_string(),
-            expires_at: expires_at,
+            expires_at,
             etag: None,
             part_number,
             is_uploaded: false,
@@ -893,7 +899,7 @@ impl From<&Part> for UploadFile {
             name: file_name.to_string(),
             dir: None,
             file: FileSource::Path(file_path),
-            size: size,
+            size,
             start: Some(part.start_byte as u64),
             end: Some(part.end_byte as u64),
         }
@@ -1315,8 +1321,8 @@ mod tests {
             Part::from_str(EXAMPLE_URL).unwrap(),
         ];
 
-        for i in 0..parts.len() {
-            parts[i].part_number = (i + 1).to_string();
+        for (i, part) in parts.iter_mut().enumerate() {
+            part.part_number = (i + 1).to_string();
         }
 
         // Insert the upload and parts

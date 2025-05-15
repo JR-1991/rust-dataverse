@@ -124,7 +124,7 @@ mod tests {
         assert_eq!(response.status, Status::OK);
         let data = response.data.expect("No data returned");
         assert!(data.in_review);
-        assert!(data.message.len() > 0);
+        assert!(!data.message.is_empty());
     }
 
     #[tokio::test]
@@ -144,7 +144,7 @@ mod tests {
         assert_eq!(response.status, Status::OK);
         let data = response.data.expect("No data returned");
         assert!(data.in_review);
-        assert!(data.message.len() > 0);
+        assert!(!data.message.is_empty());
     }
 
     #[tokio::test]
@@ -191,6 +191,6 @@ mod tests {
         assert_eq!(response.status, Status::OK);
         let data = response.data.expect("No data returned");
         assert!(!data.in_review);
-        assert!(data.message.len() > 0);
+        assert!(!data.message.is_empty());
     }
 }

@@ -80,7 +80,7 @@ mod tests {
             .expect("Failed to get ticket data");
 
         if let TicketResponse::SinglePartTicket(ticket) = ticket {
-            assert!(ticket.url.len() > 0, "No URL returned");
+            assert!(!ticket.url.is_empty(), "No URL returned");
         } else {
             panic!("Ticket is not a single part ticket");
         }
@@ -99,9 +99,9 @@ mod tests {
             .expect("Failed to get ticket data");
 
         if let TicketResponse::MultiPartTicket(ticket) = ticket {
-            assert!(ticket.urls.len() > 0, "No URLs returned");
-            assert!(ticket.abort.len() > 0, "No abort URL returned");
-            assert!(ticket.complete.len() > 0, "No complete URL returned");
+            assert!(!ticket.urls.is_empty(), "No URLs returned");
+            assert!(!ticket.abort.is_empty(), "No abort URL returned");
+            assert!(!ticket.complete.is_empty(), "No complete URL returned");
         } else {
             panic!("Ticket is not a multi part ticket");
         }

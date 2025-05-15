@@ -206,7 +206,7 @@ impl Matcher for SearchQuery {
     /// * `client` - The BaseClient to use for the API request
     fn process(self, client: &BaseClient) {
         let runtime = Runtime::new().unwrap();
-        let response = runtime.block_on(search_api::search(&client, &self));
+        let response = runtime.block_on(search_api::search(client, &self));
         evaluate_and_print_response(response);
     }
 }

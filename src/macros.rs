@@ -16,7 +16,7 @@
 #[macro_export]
 macro_rules! check_lock {
     ($client:expr, $id:expr) => {{
-        use crate::native_api::dataset::locks::get_locks;
+        use $crate::native_api::dataset::locks::get_locks;
 
         // From then env, get the timeout (in seconds)
         // We default to 20 seconds, but this can be overridden
@@ -126,7 +126,7 @@ mod tests {
 
         assert!(metadata.status.is_ok());
         if let Some(metadata) = metadata.data {
-            assert!(metadata.files.len() > 0);
+            assert!(!metadata.files.is_empty());
         } else {
             panic!("Metadata request failed");
         }

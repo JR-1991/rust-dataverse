@@ -191,12 +191,11 @@ pub async fn file_exists_at_dataset(
     })?;
 
     // Fetch the dataset metadata
-    let mut dataset_response = get_dataset_meta(client, &id, &version).await?;
-    println!("{:#?}", dataset_response);
+    let mut dataset_response = get_dataset_meta(client, id, &version).await?;
 
     if dataset_response.status.is_err() {
         // Try again with Latest version
-        dataset_response = get_dataset_meta(client, &id, &Some(DatasetVersion::Latest)).await?;
+        dataset_response = get_dataset_meta(client, id, &Some(DatasetVersion::Latest)).await?;
     }
 
     let dataset = dataset_response

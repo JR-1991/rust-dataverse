@@ -225,6 +225,12 @@ impl FileHash {
 #[derive(Clone)]
 pub struct MD5Hasher(Arc<Mutex<md5::Context>>);
 
+impl Default for MD5Hasher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MD5Hasher {
     /// Creates a new instance of the MD5 hasher.
     ///
@@ -283,6 +289,12 @@ impl SHA256Hasher {
     }
 }
 
+impl Default for SHA256Hasher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Hasher for SHA256Hasher {
     fn consume(&self, data: &[u8]) -> Result<(), Box<dyn Error + '_>> {
         let mut hasher = self.0.lock()?;
@@ -330,6 +342,12 @@ impl SHA512Hasher {
     }
 }
 
+impl Default for SHA512Hasher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Hasher for SHA512Hasher {
     fn consume(&self, data: &[u8]) -> Result<(), Box<dyn Error + '_>> {
         let mut hasher = self.0.lock()?;
@@ -374,6 +392,12 @@ impl SHA1Hasher {
     /// A new `SHA1Hasher` instance with an initialized SHA-1 context
     pub fn new() -> Self {
         SHA1Hasher(Arc::new(Mutex::new(Sha1::new())))
+    }
+}
+
+impl Default for SHA1Hasher {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -425,7 +449,6 @@ pub(crate) fn add_checksum(
     algorithm: &str,
     hash: String,
 ) -> Result<(), Box<dyn Error>> {
-    println!("Adding checksum to payload: {}", hash);
     if let Some(checksum) = payload.checksum.as_mut() {
         checksum.type_ = Some(algorithm.to_string());
         checksum.value = Some(hash);
@@ -466,7 +489,7 @@ mod tests {
         let mut payload = empty_payload();
 
         // Act
-        callback.call(&test_string.as_bytes());
+        callback.call(test_string.as_bytes());
         hasher
             .add_to_payload(&mut payload)
             .expect("Failed to add checksum to payload");
@@ -484,7 +507,7 @@ mod tests {
 
         // Act
         hasher
-            .consume(&test_string.as_bytes())
+            .consume(test_string.as_bytes())
             .expect("Failed to consume data");
 
         // Assert
@@ -502,7 +525,7 @@ mod tests {
         let mut payload = empty_payload();
 
         // Act
-        callback.call(&test_string.as_bytes());
+        callback.call(test_string.as_bytes());
         hasher
             .add_to_payload(&mut payload)
             .expect("Failed to add checksum to payload");
@@ -523,7 +546,7 @@ mod tests {
 
         // Act
         hasher
-            .consume(&test_string.as_bytes())
+            .consume(test_string.as_bytes())
             .expect("Failed to consume data");
 
         // Assert
@@ -541,7 +564,7 @@ mod tests {
         let mut payload = empty_payload();
 
         // Act
-        callback.call(&test_string.as_bytes());
+        callback.call(test_string.as_bytes());
         hasher
             .add_to_payload(&mut payload)
             .expect("Failed to add checksum to payload");
@@ -562,7 +585,7 @@ mod tests {
 
         // Act
         hasher
-            .consume(&test_string.as_bytes())
+            .consume(test_string.as_bytes())
             .expect("Failed to consume data");
 
         // Assert
@@ -580,7 +603,7 @@ mod tests {
         let mut payload = empty_payload();
 
         // Act
-        callback.call(&test_string.as_bytes());
+        callback.call(test_string.as_bytes());
         hasher
             .add_to_payload(&mut payload)
             .expect("Failed to add checksum to payload");
@@ -601,7 +624,7 @@ mod tests {
 
         // Act
         hasher
-            .consume(&test_string.as_bytes())
+            .consume(test_string.as_bytes())
             .expect("Failed to consume data");
 
         // Assert

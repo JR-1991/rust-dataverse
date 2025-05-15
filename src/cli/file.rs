@@ -86,6 +86,7 @@ impl Matcher for FileSubCommand {
                 evaluate_and_print_response(response);
             }
             FileSubCommand::Meta { id } => {
+                println!("Getting file metadata for {:?}", id);
                 let response = runtime.block_on(metadata::get_file_meta(client, &id));
                 evaluate_and_print_response(response);
             }
@@ -95,7 +96,7 @@ impl Matcher for FileSubCommand {
                 version,
             } => {
                 let response = runtime.block_on(data_access::download_datafile(
-                    &client, &id, &path, &None, &version,
+                    client, &id, &path, &None, &version,
                 ));
 
                 // In order to use the `evaluate_and_print_response` function,

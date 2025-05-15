@@ -99,6 +99,17 @@ impl<T> Response<T> {
             requestMethod: None,
         }
     }
+
+    /// Creates a new Response
+    pub fn new(status: Status, data: Option<T>, message: Option<Message>) -> Response<T> {
+        Response::<T> {
+            status,
+            data,
+            message,
+            requestUrl: None,
+            requestMethod: None,
+        }
+    }
 }
 
 impl<T> Response<T>

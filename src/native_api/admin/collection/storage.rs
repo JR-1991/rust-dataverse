@@ -113,9 +113,9 @@ mod tests {
             set_collection_storage_driver(&client, &collection_alias, "LocalStack").await;
 
         // ASSERT
-        assert_eq!(response.is_ok(), true);
+        assert!(response.is_ok());
         let response = get_collection_storage_driver(&client, &collection_alias).await;
-        assert_eq!(response.is_ok(), true);
+        assert!(response.is_ok());
         let storage_driver = response
             .expect("Failed to get storage driver")
             .data
@@ -135,7 +135,7 @@ mod tests {
         let response = get_storage_drivers(&client).await;
 
         // ASSERT
-        assert_eq!(response.is_ok(), true);
+        assert!(response.is_ok());
 
         let storage_drivers = response
             .expect("Failed to get storage drivers")

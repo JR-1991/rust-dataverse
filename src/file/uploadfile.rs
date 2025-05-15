@@ -136,9 +136,7 @@ impl UploadFile {
     /// # Returns
     /// A `Result` containing a vector of `UploadFile`s or an error.
     pub async fn chunk_file(self, part_size: u64) -> Result<Vec<UploadFile>, Box<dyn Error>> {
-        if self.file.is_receiver_stream() {
-            return Err("This method can only be used with File/Paths".into());
-        } else if self.file.is_remote_url() {
+        if self.file.is_receiver_stream() || self.file.is_remote_url() {
             return Err("This method can only be used with File/Paths".into());
         }
 
@@ -182,7 +180,7 @@ impl UploadFile {
                 .inspect_ok(move |chunk| {
                     if let Some(callbacks) = &callbacks {
                         for callback in callbacks {
-                            callback.call(&chunk);
+                            callback.call(chunk);
                         }
                     }
                     pb.inc(chunk.len() as u64);
@@ -212,7 +210,7 @@ impl UploadFile {
             .inspect_ok(move |chunk| {
                 if let Some(callbacks) = &callbacks {
                     for callback in callbacks {
-                        callback.call(&chunk);
+                        callback.call(chunk);
                     }
                 }
                 pb.inc(chunk.len() as u64);
@@ -247,7 +245,7 @@ impl UploadFile {
         let response_stream = response.bytes_stream().inspect_ok(move |chunk| {
             if let Some(callbacks) = &callbacks {
                 for callback in callbacks {
-                    callback.call(&chunk);
+                    callback.call(chunk);
                 }
             }
 
@@ -468,6 +466,19 @@ pub enum FileSource {
     RemoteUrl(Url),
 }
 
+impl FileSource {
+    /// Returns the absolute path of the file source.   
+    ///
+    /// # Returns
+    /// A `Result` containing the absolute path of the file source or an error.
+    pub fn absolute_path(&self) -> Option<PathBuf> {
+        match self {
+            FileSource::Path(path) => Some(relative_to_absolute_path(path).unwrap()),
+            _ => None,
+        }
+    }
+}
+
 impl From<ReceiverStream<Vec<u8>>> for FileSource {
     /// Converts a `ReceiverStream` into a `FileSource`.
     ///
@@ -590,7 +601,7 @@ impl FromStr for FileSource {
 ///
 /// # Returns
 /// A `Result` containing the absolute path or an error.
-fn relative_to_absolute_path(path: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
+pub(crate) fn relative_to_absolute_path(path: &PathBuf) -> Result<PathBuf, Box<dyn Error>> {
     if path.is_absolute() {
         Ok(path.clone())
     } else {
@@ -778,7 +789,7 @@ mod tests {
 
         // Setup the client and context
         let context = RequestType::File {
-            file: file,
+            file,
             callbacks: None,
         };
         let client = BaseClient::new(&server.url("/"), None).expect("Could not create client");
@@ -883,7 +894,7 @@ mod tests {
         let client = BaseClient::new(&server.url("/"), None).expect("Could not create client");
 
         // Download the content
-        let remote_url = Url::parse(format!("{}", server.url("/download")).as_str()).unwrap();
+        let remote_url = Url::parse(&server.url("/download")).unwrap();
         let upload_file = UploadFile::from(remote_url);
         let context = RequestType::File {
             file: upload_file,
@@ -936,7 +947,7 @@ mod tests {
 
         // Create a mock endpoint for each expected chunk
         // This allows us to verify both the content and number of chunks
-        let num_chunks = (content.len() + part_size - 1) / part_size;
+        let num_chunks = content.len().div_ceil(part_size);
         for i in 0..num_chunks {
             // Calculate the expected content for this chunk
             let part = {
@@ -970,7 +981,7 @@ mod tests {
         // Upload each chunk to its corresponding endpoint
         for (i, file) in chunked_files.into_iter().enumerate() {
             let context = RequestType::File {
-                file: file,
+                file,
                 callbacks: None,
             };
 
@@ -1023,7 +1034,7 @@ mod tests {
 
         // Create a mock endpoint for each expected chunk
         // This allows us to verify both the content and number of chunks
-        let num_chunks = (content.len() + part_size - 1) / part_size;
+        let num_chunks = content.len().div_ceil(part_size);
         for i in 0..num_chunks {
             // Calculate the expected content for this chunk
             let part = {
@@ -1057,7 +1068,7 @@ mod tests {
         // Upload each chunk to its corresponding endpoint
         for (i, file) in chunked_files.into_iter().enumerate() {
             let context = RequestType::File {
-                file: file,
+                file,
                 callbacks: None,
             };
 
