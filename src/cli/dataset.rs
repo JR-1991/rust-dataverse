@@ -238,7 +238,7 @@ pub enum DatasetSubCommand {
         format: String,
 
         #[structopt(short, long, help = "Path to the file to save the export to")]
-        out: Option<PathBuf>,
+        out: PathBuf,
     },
 
     /// Get locks for a dataset
@@ -432,14 +432,40 @@ impl Matcher for DatasetSubCommand {
             } => {
                 let response = runtime.block_on(dataset::export_dataset(client, &id, &exporter));
 
-                if let Some(out) = out {
-                    let mut file = File::create(out).expect("Failed to create file");
-                    let content = response.expect("Failed to get content");
-                    file.write_all(content.data.expect("Failed to get data").as_bytes())
+                // Handle the response
+                let content = match response {
+                    Ok(response) => match response.data {
+                        Some(data) => data,
+                        None => {
+                            eprintln!("Error: No data returned from export");
+                            return;
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        return;
+                    }
+                };
+
+                // Create the output directory if it doesn't exist
+                if let Some(parent) = out.parent() {
+                    std::fs::create_dir_all(parent).expect("Failed to create output directory");
+                }
+
+                let mut file = File::create(&out).expect("Failed to create file");
+
+                // Check if it is JSON-compatible and pretty print it
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                    let pretty_json =
+                        serde_json::to_string_pretty(&json).expect("Failed to pretty print JSON");
+                    file.write_all(pretty_json.as_bytes())
                         .expect("Failed to write to file");
                 } else {
-                    evaluate_and_print_response(response);
+                    file.write_all(content.as_bytes())
+                        .expect("Failed to write to file");
                 }
+
+                println!("Exported dataset to {}", out.display().bold().green());
             }
             DatasetSubCommand::Locks {
                 id,
