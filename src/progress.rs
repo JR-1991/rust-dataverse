@@ -9,11 +9,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 ///
 /// # Returns
 /// A `ProgressBar` instance.
-pub fn setup_progress_log(
-    file_size: u64,
-    offset: Option<u64>,
-    name: &str,
-) -> ProgressBar {
+pub fn setup_progress_log(file_size: u64, offset: Option<u64>, name: &str) -> ProgressBar {
     if file_size == 0 {
         spinner()
     } else {
@@ -38,7 +34,7 @@ fn progress_bar(file_size: u64, offset: Option<u64>, name: &str) -> ProgressBar 
     }
 
     pb.set_style(ProgressStyle::default_bar()
-        .template(&(name.to_owned() + " {bar:40.cyan} {percent:.cyan}% | {bytes}/{total_bytes} ({eta})\n"))
+        .template(&(name.to_owned() + " {bar:40.cyan} {percent:.cyan}% | {bytes}/{total_bytes} ({elapsed_precise}/{eta}) {wide_msg}\n"))
         .expect("Could not set progress bar style")
         .progress_chars("=>-"));
 
@@ -52,10 +48,12 @@ fn progress_bar(file_size: u64, offset: Option<u64>, name: &str) -> ProgressBar 
 fn spinner() -> ProgressBar {
     let pb = ProgressBar::new_spinner();
 
-    pb.set_style(ProgressStyle::default_spinner()
-        .template("{spinner:.cyan} Uploaded {bytes}")
-        .expect("Error setting progress style")
-        .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠏"));
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} Uploaded {bytes}")
+            .expect("Error setting progress style")
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠏"),
+    );
 
     pb
 }
