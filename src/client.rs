@@ -62,10 +62,6 @@ impl BaseClient {
         headers.insert("Connection", HeaderValue::from_static("keep-alive"));
         headers.insert("Accept", HeaderValue::from_static("*/*"));
         headers.insert("User-Agent", HeaderValue::from_static("dv-rs/0.1.0"));
-        headers.insert(
-            "Accept-Encoding",
-            HeaderValue::from_static("gzip, deflate, br, zstd"),
-        );
 
         headers
     }
