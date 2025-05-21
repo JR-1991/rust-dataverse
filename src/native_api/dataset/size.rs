@@ -21,8 +21,7 @@ import_types!(schema = "models/dataset/size.json", struct_builder = true,);
 /// # Arguments
 ///
 /// * `client` - A reference to the `BaseClient` instance used to send the request.
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset.
 /// * `version` - An optional `DatasetVersion` specifying the version of the dataset.
 ///
 /// # Returns

@@ -19,8 +19,7 @@ use crate::{
 /// # Arguments
 ///
 /// * `client` - A reference to the `BaseClient` instance used to send the request.
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset whose metadata is to be retrieved.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset whose metadata is to be retrieved.
 ///
 /// # Returns
 ///
@@ -55,13 +54,11 @@ pub async fn get_dataset_meta(
 ///
 /// # Arguments
 ///
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset.
 ///
 /// # Returns
 ///
-/// An `Option<HashMap<String, String>>` containing the query parameters if the identifier is a persistent ID,
-/// or `None` if the identifier is a numeric ID.
+/// An `Option<HashMap<String, String>>` containing the query parameters if the identifier is a persistent ID, or `None` if the identifier is a numeric ID.
 pub(crate) fn id_query_params(id: &Identifier) -> Option<HashMap<String, String>> {
     match id {
         Identifier::PersistentId(id) => {

@@ -27,8 +27,7 @@ use crate::{client::BaseClient, identifier::Identifier, request::RequestType};
 /// # Arguments
 ///
 /// * `client` - A reference to the `BaseClient` instance used to send the request.
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset.
 /// * `out_dir` - A `PathBuf` instance representing the output directory where the files will be saved.
 /// * `bundle_name` - An optional `String` containing the name of the file bundle.
 /// * `version` - An optional `DatasetVersion` specifying the version of the dataset to download.

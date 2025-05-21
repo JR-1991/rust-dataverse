@@ -34,8 +34,7 @@ import_types!(
 /// # Arguments
 ///
 /// * `client` - A reference to the `BaseClient` instance used to send the request.
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset to which the file will be uploaded.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset to which the file will be uploaded.
 /// * `fpath` - A `PathBuf` instance representing the file path of the file to be uploaded.
 /// * `body` - An optional `UploadBody` struct instance containing additional metadata for the upload.
 /// * `callback` - An optional `CallbackFun` instance for handling callbacks during the upload process.
@@ -147,11 +146,9 @@ pub(crate) async fn send_file_upload_request(
 /// # Arguments
 ///
 /// * `client` - A reference to the `BaseClient` instance used to send the request.
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset.
 /// * `fpath` - A `PathBuf` instance representing the file path of the file to be checked.
-/// * `version` - An optional `DatasetVersion` enum instance specifying which version of the dataset to check.
-///               If not provided, the function will first try with the provided version, then fall back to the latest version.
+/// * `version` - An optional `DatasetVersion` enum instance specifying which version of the dataset to check. If not provided, the function will first try with the provided version, then fall back to the latest version.
 ///
 /// # Returns
 ///

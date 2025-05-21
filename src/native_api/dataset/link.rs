@@ -20,8 +20,7 @@ import_types!(schema = "models/message.json", struct_builder = true,);
 /// # Arguments
 ///
 /// * `client` - A reference to the `BaseClient` instance used to send the request.
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset to be linked.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset to be linked.
 /// * `collection_id` - A string slice that holds the ID of the collection to which the dataset will be linked.
 ///
 /// # Returns

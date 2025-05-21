@@ -142,6 +142,6 @@ mod tests {
             .data
             .expect("Failed to get storage drivers data");
 
-        assert!(storage_drivers.len() > 0);
+        assert!(!storage_drivers.is_empty());
     }
 }

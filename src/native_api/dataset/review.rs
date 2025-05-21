@@ -18,8 +18,7 @@ import_types!(schema = "models/dataset/review.json", struct_builder = true,);
 /// # Arguments
 ///
 /// * `client` - A reference to the `BaseClient` instance used to send the request.
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset to be submitted for review.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset to be submitted for review.
 ///
 /// # Returns
 ///
@@ -62,8 +61,7 @@ pub async fn submit_for_review(
 /// # Arguments
 ///
 /// * `client` - A reference to the `BaseClient` instance used to send the request.
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset to be returned from review.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset to be returned from review.
 /// * `reason_for_return` - A string slice representing the reason for returning the dataset to the author.
 ///
 /// # Returns

@@ -14,8 +14,7 @@ use crate::{
 /// # Arguments
 ///
 /// * `client` - A reference to the `BaseClient` instance used to send the request.
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset to be exported.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset to be exported.
 /// * `exporter` - A string slice that specifies the export format to use (e.g., "ddi", "oai_ddi", "datacite", etc.).
 ///
 /// # Returns

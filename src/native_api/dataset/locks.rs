@@ -19,8 +19,7 @@ import_types!(schema = "models/dataset/locks.json", struct_builder = true,);
 /// # Arguments
 ///
 /// * `client` - A reference to the `BaseClient` instance used to send the request.
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset.
 /// * `lock_type` - An optional `LockType` enum value to filter locks by type.
 ///
 /// # Returns
@@ -72,8 +71,7 @@ pub async fn get_locks(
 /// # Arguments
 ///
 /// * `client` - A reference to the `BaseClient` instance used to send the request.
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset.
 /// * `lock_type` - A `LockType` enum value specifying the type of lock to apply.
 ///
 /// # Returns
@@ -116,10 +114,8 @@ pub async fn set_lock(
 /// # Arguments
 ///
 /// * `client` - A reference to the `BaseClient` instance used to send the request.
-/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`,
-///          representing the unique identifier of the dataset.
-/// * `lock_type` - An optional `LockType` enum value specifying the type of lock to remove.
-///                 If set to `None`, all locks will be removed.
+/// * `id` - An `Identifier` enum instance, which can be either a `PersistentId(String)` or an `Id(i64)`, representing the unique identifier of the dataset.
+/// * `lock_type` - An optional `LockType` enum value specifying the type of lock to remove. If set to `None`, all locks will be removed.
 ///
 /// # Returns
 ///
