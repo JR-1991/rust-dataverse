@@ -1,6 +1,8 @@
+use colored::Colorize;
+
 use crate::{
     client::BaseClient,
-    prelude::Identifier,
+    prelude::{info::get_exporters, Identifier},
     request::RequestType,
     response::{Response, Status},
 };
@@ -27,6 +29,16 @@ pub async fn export_dataset(
     id: &Identifier,
     exporter: &str,
 ) -> Result<Response<String>, String> {
+    // First, check if the exporter is valid
+    let exporters = get_exporters(client).await?;
+    let exporters = exporters.data.unwrap();
+    if !exporters.contains_key(exporter) {
+        return Err(format!(
+            "Export format {} does not exist",
+            exporter.bold().red()
+        ));
+    }
+
     // Parse the identifier
     let path = match id {
         Identifier::Id(id) => format!("/api/datasets/{id}/export?exporter={exporter}"),
