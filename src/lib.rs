@@ -119,10 +119,14 @@ pub mod native_api {
 
     /// Information retrieval operations
     pub mod info {
+        pub use exporters::get_exporters;
         pub use version::get_version;
 
         /// Version information
         pub mod version;
+
+        /// Exporters information
+        pub mod exporters;
     }
 
     /// Dataset operations
