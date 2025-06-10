@@ -46,6 +46,7 @@ sqlx = { version = "0.8.4", features = ["runtime-tokio-native-tls", "sqlite"] }
 dirs = "6.0.0"
 mime_guess = "2.0.5"
 infer = "0.19.0"
+bon = "3.6.3"
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 libdbus-sys = { version = "0.2.5", features = ["vendored"] }
