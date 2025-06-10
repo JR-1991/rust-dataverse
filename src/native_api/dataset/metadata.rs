@@ -30,13 +30,17 @@ pub async fn get_dataset_meta(
     id: &Identifier,
     version: &Option<DatasetVersion>,
 ) -> Result<Response<GetDatasetResponse>, String> {
-    // Determine the version of the dataset to get
-    let version = determine_version(version, client.has_api_token()).to_string();
-
     // Endpoint metadata
-    let url = match id {
-        Identifier::PersistentId(_) => format!("api/datasets/:persistentId/versions/{version}"),
-        Identifier::Id(id) => format!("api/datasets/{id}/versions/{version}"),
+    let url = if let Some(version) = version {
+        match id {
+            Identifier::PersistentId(_) => format!("api/datasets/:persistentId/versions/{version}"),
+            Identifier::Id(id) => format!("api/datasets/{id}/versions/{version}"),
+        }
+    } else {
+        match id {
+            Identifier::PersistentId(_) => format!("api/datasets/:persistentId"),
+            Identifier::Id(_) => format!("api/datasets/{id}"),
+        }
     };
 
     // Send request
