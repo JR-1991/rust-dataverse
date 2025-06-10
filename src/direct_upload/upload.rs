@@ -83,6 +83,7 @@ impl From<Vec<DirectUploadBody>> for BatchDirectUploadBody {
 /// A `Result` containing either:
 /// * `Response<DirectUploadResponse>` - The server response after successful upload
 /// * `String` - An error message if the upload failed
+#[bon::builder]
 pub async fn direct_upload(
     client: &BaseClient,
     id: Identifier,
@@ -130,13 +131,15 @@ pub async fn direct_upload(
 /// A `Result` containing either:
 /// * `()` - Indicates successful batch upload
 /// * `String` - An error message if the upload failed
+#[bon::builder]
 pub async fn batch_direct_upload(
     client: &BaseClient,
     id: Identifier,
     files: Vec<impl Into<UploadFile>>,
     hasher: impl TryInto<FileHash, Error = String>,
-    body: Vec<impl Into<DirectUploadBody>>,
+    bodies: Vec<impl Into<DirectUploadBody>>,
     n_parallel_uploads: impl Into<Option<usize>>,
+    callbacks: Option<Vec<Vec<CallbackFun>>>,
 ) -> Result<Response<BatchDirectUploadResponse>, String> {
     // Connect to the database or create it if it doesn't exist
     // This database is used to track the upload progress of multi-part uploads
@@ -145,11 +148,21 @@ pub async fn batch_direct_upload(
     let path = env::var("DVCLI_DB_PATH").ok();
     let pool = create_database(path).await.map_err(|e| e.to_string())?;
 
+    // Check if there are callbacks
+    let callbacks = if let Some(callbacks) = callbacks {
+        if callbacks.len() != files.len() {
+            return Err("Number of callbacks does not match number of files".to_string());
+        }
+        callbacks.into_iter().map(|cb| Some(cb)).collect()
+    } else {
+        vec![None; files.len()]
+    };
+
     // Cleanup before starting the upload
     cleanup_expired_and_complete_uploads(&pool).await?;
 
     // Check if the number of files matches the number of body entries
-    if files.len() != body.len() {
+    if files.len() != bodies.len() {
         return Err("Number of files does not match number of body entries".to_string());
     }
 
@@ -164,7 +177,7 @@ pub async fn batch_direct_upload(
     let mut handles = Vec::new();
 
     // Iterate through files and bodies together
-    for (file, file_body) in files.into_iter().zip(body.into_iter()) {
+    for ((file, file_body), callback) in files.into_iter().zip(bodies.into_iter()).zip(callbacks) {
         let file = file.into();
         let semaphore_clone = semaphore.clone();
         let pool_clone = pool.clone();
@@ -184,7 +197,7 @@ pub async fn batch_direct_upload(
                 file,
                 hasher_clone,
                 body_clone,
-                None,
+                callback,
                 &pool_clone,
             )
             .await?;
@@ -364,7 +377,7 @@ async fn upload_single_part(
     // Upload the file
     let context = RequestType::File {
         file,
-        callbacks: None,
+        callbacks: Some(callback_vec),
     };
 
     let response = client
@@ -848,16 +861,16 @@ mod tests {
 
         // ACT
         // Perform the file upload
-        direct_upload(
-            &client,
-            Identifier::PersistentId(pid.clone()),
-            file,
-            "MD5",
-            body,
-            None,
-        )
-        .await
-        .expect("Failed to upload file");
+        let id = Identifier::PersistentId(pid.clone());
+        direct_upload()
+            .client(&client)
+            .id(id)
+            .file(file)
+            .hasher("MD5")
+            .body(body)
+            .call()
+            .await
+            .expect("Failed to upload file");
 
         // ASSERT
         // Verify the file was uploaded successfully
@@ -897,16 +910,16 @@ mod tests {
 
         // ACT
         // Perform the multi-part upload
-        direct_upload(
-            &client,
-            Identifier::PersistentId(pid.clone()),
-            file_path,
-            "MD5",
-            body,
-            None,
-        )
-        .await
-        .expect("Failed to upload file");
+        let id = Identifier::PersistentId(pid.clone());
+        direct_upload()
+            .client(&client)
+            .id(id)
+            .file(file_path)
+            .hasher("MD5")
+            .body(body)
+            .call()
+            .await
+            .expect("Failed to upload file");
 
         // ASSERT
         // Verify file upload and checksum
@@ -970,16 +983,16 @@ mod tests {
 
         // ACT
         // Perform the multi-part upload
-        direct_upload(
-            &client,
-            Identifier::PersistentId(pid.clone()),
-            file_path,
-            "MD5",
-            body,
-            None,
-        )
-        .await
-        .expect("Failed to upload file");
+        let id = Identifier::PersistentId(pid.clone());
+        direct_upload()
+            .client(&client)
+            .id(id)
+            .file(file_path)
+            .hasher("MD5")
+            .body(body)
+            .call()
+            .await
+            .expect("Failed to upload file");
 
         // ASSERT
         // Verify file upload and checksum
@@ -1051,16 +1064,17 @@ mod tests {
 
         // ACT
         // Perform the multi-part upload
-        let response = batch_direct_upload(
-            &client,
-            Identifier::PersistentId(pid.clone()),
-            vec![file1_path, file2_path],
-            "MD5",
-            vec![body1, body2],
-            2,
-        )
-        .await
-        .expect("Failed to upload file");
+        let id = Identifier::PersistentId(pid.clone());
+        let response = batch_direct_upload()
+            .client(&client)
+            .id(id)
+            .hasher("MD5")
+            .files(vec![file1_path, file2_path])
+            .bodies(vec![body1, body2])
+            .n_parallel_uploads(2)
+            .call()
+            .await
+            .expect("Failed to upload files");
 
         assert!(response.status.is_ok(), "Batch upload failed");
 
@@ -1133,16 +1147,17 @@ mod tests {
 
         // ACT
         // Perform the multi-part upload
-        batch_direct_upload(
-            &client,
-            Identifier::PersistentId(pid.clone()),
-            vec![file1_path, file2_path],
-            "MD5",
-            vec![body1, body2],
-            2,
-        )
-        .await
-        .expect("Failed to upload file");
+        let id = Identifier::PersistentId(pid.clone());
+        batch_direct_upload()
+            .client(&client)
+            .id(id)
+            .hasher("MD5")
+            .files(vec![file1_path, file2_path])
+            .bodies(vec![body1, body2])
+            .n_parallel_uploads(2)
+            .call()
+            .await
+            .expect("Failed to upload files");
     }
 
     #[tokio::test]

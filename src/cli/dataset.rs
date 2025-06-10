@@ -12,6 +12,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use chrono::ParseResult;
 use colored_json::Paint;
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
@@ -383,9 +384,17 @@ impl Matcher for DatasetSubCommand {
                     .collect::<Result<Vec<_>, _>>()
                     .expect("Failed to create direct upload bodies");
 
-                let response = runtime.block_on(direct_upload::batch_direct_upload(
-                    client, id, paths, "MD5", bodies, parallel,
-                ));
+                let response = runtime.block_on(
+                    direct_upload::batch_direct_upload()
+                        .client(&client)
+                        .id(id)
+                        .files(paths)
+                        .bodies(bodies)
+                        .hasher("MD5")
+                        .n_parallel_uploads(parallel)
+                        .call(),
+                );
+
                 evaluate_and_print_response(response);
             }
             DatasetSubCommand::Download {
