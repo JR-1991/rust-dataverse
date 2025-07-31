@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExternalToolResponse",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Unique identifier for the registered external tool"
+    },
+    "displayName": {
+      "type": "string",
+      "description": "The name of the tool in the Dataverse installation web interface"
+    },
+    "description": {
+      "type": "string",
+      "description": "The description of the tool, which appears in a popup (for configure tools only). HTML is supported"
+    },
+    "toolName": {
+      "type": "string",
+      "description": "A name used to differentiate between external tools and for localization in the Dataverse installation web interface"
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["file", "dataset"],
+      "description": "Whether the external tool appears and operates at the file level or the dataset level"
+    },
+    "types": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["explore", "preview", "query", "configure"]
+      },
+      "description": "Whether the external tool is an explore tool, a preview tool, a query tool, a configure tool or any combination of these"
+    },
+    "toolUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "The base URL of the tool before query parameters are added"
+    },
+    "contentType": {
+      "type": "string",
+      "description": "File level tools operate on a specific file type (content type or MIME type such as 'application/pdf'). Dataset level tools do not use contentType"
+    },
+    "httpMethod": {
+      "type": "string",
+      "enum": ["GET", "POST"],
+      "description": "Either GET or POST"
+    },
+    "toolParameters": {
+      "type": "string",
+      "description": "JSON string representation of the tool parameters object containing query parameters for substitution"
+    },
+    "allowedApiCalls": {
+      "type": "string",
+      "description": "JSON string representation of an array of objects defining callbacks the tool is allowed to make to the Dataverse API"
+    },
+    "requirements": {
+      "type": "string",
+      "description": "JSON string representation of resources your tool needs to function"
+    }
+  },
+  "required": ["id", "displayName", "scope", "toolUrl"],
+  "additionalProperties": false
+}
