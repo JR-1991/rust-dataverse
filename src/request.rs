@@ -295,8 +295,7 @@ mod tests {
             .contains("multipart/form-data"));
         assert!(
             request.body().is_some(),
-            "Body not found in request: {:?}",
-            request
+            "Body not found in request: {request:?}"
         );
     }
 
@@ -322,8 +321,7 @@ mod tests {
         assert_eq!(request.method(), reqwest::Method::GET);
         assert!(
             request.body().is_some(),
-            "Body not found in request: {:?}",
-            request
+            "Body not found in request: {request:?}"
         );
     }
 

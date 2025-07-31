@@ -40,7 +40,7 @@ pub async fn get_locks(
     // Endpoint metadata
     let path = match id {
         Identifier::PersistentId(_) => "api/datasets/:persistentId/locks".to_string(),
-        Identifier::Id(id) => format!("api/datasets/{}/locks", id),
+        Identifier::Id(id) => format!("api/datasets/{id}/locks"),
     };
 
     // Build parameters
@@ -93,11 +93,10 @@ pub async fn set_lock(
     let path = match id {
         Identifier::PersistentId(pid) => {
             format!(
-                "api/datasets/:persistentId/lock/{}?persistentId={}",
-                lock_type, pid
+                "api/datasets/:persistentId/lock/{lock_type}?persistentId={pid}"
             )
         }
-        Identifier::Id(id) => format!("api/datasets/{}/lock/{}", id, lock_type),
+        Identifier::Id(id) => format!("api/datasets/{id}/lock/{lock_type}"),
     };
 
     // Send request
@@ -134,7 +133,7 @@ pub async fn remove_lock(
     // Endpoint metadata
     let path = match &id {
         Identifier::PersistentId(_) => "api/datasets/:persistentId/locks".to_string(),
-        Identifier::Id(id) => format!("api/datasets/{}/locks", id),
+        Identifier::Id(id) => format!("api/datasets/{id}/locks"),
     };
 
     // Build parameters
@@ -240,7 +239,7 @@ mod tests {
         assert_eq!(locks.status, Status::OK);
         assert!(locks.data.is_some());
         let locks = locks.data.unwrap();
-        println!("{:?}", locks);
+        println!("{locks:?}");
         assert_eq!(locks.len(), 0);
     }
 
@@ -263,7 +262,7 @@ mod tests {
         .expect("Failed to set lock");
 
         if let Status::ERROR = response.status {
-            panic!("Failed to set lock: {:?}", response);
+            panic!("Failed to set lock: {response:?}");
         }
 
         // Get locks

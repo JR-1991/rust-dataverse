@@ -146,7 +146,7 @@ where
             println!("{}", success_message());
             println!("{}\n", json_str.to_colored_json_auto().unwrap());
         } else {
-            println!("{}", json_str);
+            println!("{json_str}");
         }
     }
 }
@@ -179,7 +179,7 @@ pub enum Message {
 impl std::fmt::Display for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Message::PlainMessage(message) => write!(f, "{}", message),
+            Message::PlainMessage(message) => write!(f, "{message}"),
             Message::NestedMessage(nested_message) => {
                 write!(f, "{}", nested_message.message.as_ref().unwrap())
             }
@@ -260,8 +260,8 @@ mod tests {
             message: Some("nested message".to_string()),
         });
 
-        assert_eq!(format!("{}", plain_message), "plain message");
-        assert_eq!(format!("{}", nested_message), "nested message");
+        assert_eq!(format!("{plain_message}"), "plain message");
+        assert_eq!(format!("{nested_message}"), "nested message");
     }
 
     #[test]
@@ -270,6 +270,6 @@ mod tests {
             message: Some("nested message".to_string()),
         };
 
-        assert_eq!(format!("{}", nested_message), "nested message");
+        assert_eq!(format!("{nested_message}"), "nested message");
     }
 }

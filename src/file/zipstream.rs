@@ -83,12 +83,7 @@ impl AsyncWrite for ZipStream {
         let sender = self.sender.clone();
 
         // Store the future inside the struct to track its progress between poll_write calls
-        let send_fut = async move {
-            sender
-                .send(data)
-                .await
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-        };
+        let send_fut = async move { sender.send(data).await.map_err(io::Error::other) };
 
         // Pin the future
         let mut fut = Box::pin(send_fut);

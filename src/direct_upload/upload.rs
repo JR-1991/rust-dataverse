@@ -153,7 +153,7 @@ pub async fn batch_direct_upload(
         if callbacks.len() != files.len() {
             return Err("Number of callbacks does not match number of files".to_string());
         }
-        callbacks.into_iter().map(|cb| Some(cb)).collect()
+        callbacks.into_iter().map(Some).collect()
     } else {
         vec![None; files.len()]
     };
@@ -601,7 +601,7 @@ async fn complete_upload(
     } else {
         let status = response.status();
         let text = response.text().await.unwrap_or_default();
-        println!("Complete upload failed ({}): {}", status, text);
+        println!("Complete upload failed ({status}): {text}");
         Err(text)
     }
 }
@@ -634,9 +634,9 @@ async fn register_file(
     // Endpoint metadata
     let path = match id {
         Identifier::PersistentId(pid) => {
-            format!("api/datasets/:persistentId/add?persistentId={}", pid)
+            format!("api/datasets/:persistentId/add?persistentId={pid}")
         }
-        Identifier::Id(id) => format!("api/datasets/{}/add", id),
+        Identifier::Id(id) => format!("api/datasets/{id}/add"),
     };
 
     // Build context
@@ -666,9 +666,9 @@ async fn register_batch_files(
 
     let path = match id {
         Identifier::PersistentId(pid) => {
-            format!("api/datasets/:persistentId/addFiles?persistentId={}", pid)
+            format!("api/datasets/:persistentId/addFiles?persistentId={pid}")
         }
-        Identifier::Id(id) => format!("api/datasets/{}/addFiles", id),
+        Identifier::Id(id) => format!("api/datasets/{id}/addFiles"),
     };
 
     let body = assemble_upload_body(Some(body.into()));

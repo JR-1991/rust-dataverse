@@ -75,8 +75,7 @@ pub async fn download_dataset_files(
     .await
     .map_err(|e| {
         format!(
-            "Failed to fetch file bundle from dataset: {} ({})",
-            e, version
+            "Failed to fetch file bundle from dataset: {e} ({version})"
         )
     })?;
 
@@ -134,7 +133,7 @@ async fn prepare_download(
     let version = determine_version(version, client.has_api_token());
     let bundle_size = get_dataset_size(client, id, &Some(version.clone()))
         .await
-        .map_err(|e| format!("Failed to fetch dataset size: {}", e))?
+        .map_err(|e| format!("Failed to fetch dataset size: {e}"))?
         .data
         .ok_or("Bundle size response has no data".to_string())?
         .storage_size

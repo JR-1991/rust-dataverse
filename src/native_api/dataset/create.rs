@@ -56,7 +56,7 @@ pub async fn create_dataset(
     body: DatasetCreateBody,
 ) -> Result<Response<DatasetCreateResponse>, String> {
     // Endpoint metadata
-    let url = format!("api/dataverses/{}/datasets", parent);
+    let url = format!("api/dataverses/{parent}/datasets");
 
     // Build body
     let body = serde_json::to_string(&body).unwrap();

@@ -46,7 +46,7 @@ pub async fn set_collection_storage_driver(
     alias: &str,
     driver: &str,
 ) -> Result<Response<SetStorageDriverResponse>, String> {
-    let url = format!("api/admin/dataverse/{}/storageDriver", alias);
+    let url = format!("api/admin/dataverse/{alias}/storageDriver");
 
     let context = RequestType::Raw(driver.to_string());
     let response = client.put(url.as_str(), None, context, None).await;
@@ -68,7 +68,7 @@ pub async fn get_collection_storage_driver(
     client: &BaseClient,
     alias: &str,
 ) -> Result<Response<GetStorageDriverResponse>, String> {
-    let url = format!("api/admin/dataverse/{}/storageDriver", alias);
+    let url = format!("api/admin/dataverse/{alias}/storageDriver");
     let response = client
         .get(url.as_str(), None, RequestType::Plain, None)
         .await;
@@ -89,7 +89,7 @@ pub async fn reset_collection_storage_driver(
     client: &BaseClient,
     alias: &str,
 ) -> Result<Response<ResetStorageDriverResponse>, String> {
-    let url = format!("/api/admin/dataverse/{}/storageDriver", alias);
+    let url = format!("/api/admin/dataverse/{alias}/storageDriver");
     let response = client
         .delete(url.as_str(), None, RequestType::Plain, None)
         .await;

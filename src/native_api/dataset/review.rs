@@ -38,10 +38,9 @@ pub async fn submit_for_review(
 ) -> Result<Response<ReviewResponse>, String> {
     // Endpoint metadata
     let url = match id {
-        Identifier::Id(id) => format!("api/datasets/{}/submitForReview", id),
+        Identifier::Id(id) => format!("api/datasets/{id}/submitForReview"),
         Identifier::PersistentId(pid) => format!(
-            "api/datasets/:persistentId/submitForReview?persistentId={}",
-            pid
+            "api/datasets/:persistentId/submitForReview?persistentId={pid}"
         ),
     };
 
@@ -76,10 +75,9 @@ pub async fn return_to_author(
 ) -> Result<Response<ReviewResponse>, String> {
     // Endpoint metadata
     let url = match id {
-        Identifier::Id(id) => format!("api/datasets/{}/returnToAuthor", id),
+        Identifier::Id(id) => format!("api/datasets/{id}/returnToAuthor"),
         Identifier::PersistentId(pid) => format!(
-            "api/datasets/:persistentId/returnToAuthor?persistentId={}",
-            pid
+            "api/datasets/:persistentId/returnToAuthor?persistentId={pid}"
         ),
     };
 
@@ -87,7 +85,7 @@ pub async fn return_to_author(
     let body = serde_json::to_string(&ReturnToAuthorBody {
         reason_for_return: reason_for_return.to_string(),
     })
-    .map_err(|e| format!("Failed to serialize return to author body: {}", e))?;
+    .map_err(|e| format!("Failed to serialize return to author body: {e}"))?;
 
     // Send request
     let context = RequestType::JSON { body };

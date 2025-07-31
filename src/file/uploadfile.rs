@@ -959,7 +959,7 @@ mod tests {
             // Create a mock that expects this specific chunk content
             let mock = server.mock(|when, then| {
                 when.method(httpmock::Method::PUT)
-                    .path(format!("/upload/{}", i).as_str())
+                    .path(format!("/upload/{i}").as_str())
                     .header("Content-Length", part.len().to_string())
                     .body(part); // Verify exact content of each chunk
                 then.status(200);
@@ -986,7 +986,7 @@ mod tests {
             };
 
             client
-                .put(format!("/upload/{}", i).as_str(), None, context, None)
+                .put(format!("/upload/{i}").as_str(), None, context, None)
                 .await
                 .expect("Could not send request");
         }
@@ -1046,7 +1046,7 @@ mod tests {
             // Create a mock that expects this specific chunk content
             let mock = server.mock(|when, then| {
                 when.method(httpmock::Method::PUT)
-                    .path(format!("/upload/{}", i).as_str())
+                    .path(format!("/upload/{i}").as_str())
                     .header("Content-Length", part.len().to_string())
                     .body(part); // Verify exact content of each chunk
                 then.status(200);
@@ -1073,7 +1073,7 @@ mod tests {
             };
 
             client
-                .put(format!("/upload/{}", i).as_str(), None, context, None)
+                .put(format!("/upload/{i}").as_str(), None, context, None)
                 .await
                 .expect("Could not send request");
         }

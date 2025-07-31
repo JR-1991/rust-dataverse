@@ -41,7 +41,7 @@ pub async fn link_dataset(
     };
 
     // Endpoint metadata
-    let url = format!("/api/datasets/{}/link/{}", dataset_id, collection_id);
+    let url = format!("/api/datasets/{dataset_id}/link/{collection_id}");
 
     // Send request
     let context = RequestType::Plain;

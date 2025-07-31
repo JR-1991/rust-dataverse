@@ -31,7 +31,7 @@ pub fn evaluate_and_print_response<T: Serialize>(response: Result<Response<T>, S
             response.print_result();
         }
         Err(e) => {
-            println!("Error: {}", e);
+            println!("Error: {e}");
         }
     }
 }
@@ -56,10 +56,10 @@ where
 {
     let value = matches
         .get_one::<U>(arg_name)
-        .unwrap_or_else(|| panic!("{} is required.", arg_name))
+        .unwrap_or_else(|| panic!("{arg_name} is required."))
         .as_ref()
         .parse::<T>()
-        .unwrap_or_else(|_| panic!("{} is invalid.", arg_name));
+        .unwrap_or_else(|_| panic!("{arg_name} is invalid."));
 
     value
 }

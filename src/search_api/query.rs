@@ -245,7 +245,7 @@ impl FromStr for SearchType {
             "dataverse" => Ok(SearchType::Dataverse),
             "dataset" => Ok(SearchType::Dataset),
             "file" => Ok(SearchType::File),
-            _ => Err(format!("Invalid search type: {}", input)),
+            _ => Err(format!("Invalid search type: {input}")),
         }
     }
 }
@@ -280,7 +280,7 @@ impl FromStr for SortField {
         match input.to_lowercase().as_str() {
             "name" => Ok(SortField::Name),
             "date" => Ok(SortField::Date),
-            _ => Err(format!("Invalid sort field: {}", input)),
+            _ => Err(format!("Invalid sort field: {input}")),
         }
     }
 }
@@ -315,7 +315,7 @@ impl FromStr for Order {
         match input.to_lowercase().as_str() {
             "asc" => Ok(Order::Asc),
             "desc" => Ok(Order::Desc),
-            _ => Err(format!("Invalid order: {}", input)),
+            _ => Err(format!("Invalid order: {input}")),
         }
     }
 }

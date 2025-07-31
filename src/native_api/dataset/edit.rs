@@ -118,7 +118,7 @@ mod tests {
 
         // Assert the request was successful
         let message = serde_json::to_string(&response).unwrap();
-        assert!(response.status.is_ok(), "Response: {}", message);
+        assert!(response.status.is_ok(), "Response: {message}");
     }
 
     /// Tests the editing of dataset metadata without replacement.
@@ -153,7 +153,7 @@ mod tests {
 
         // Assert the request was successful
         let message = serde_json::to_string(&response).unwrap();
-        assert!(response.status.is_ok(), "Response: {}", message);
+        assert!(response.status.is_ok(), "Response: {message}");
     }
 
     /// Tests the editing of dataset metadata with an invalid persistent identifier (PID).

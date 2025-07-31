@@ -264,7 +264,7 @@ async fn get_full_dv_path(client: &BaseClient, id: &Identifier) -> Result<String
     let directory_label = metadata.directory_label;
 
     Ok(if let Some(directory_label) = directory_label {
-        format!("{}/{}", directory_label, label)
+        format!("{directory_label}/{label}")
     } else {
         label
     })
@@ -313,7 +313,7 @@ pub(crate) fn construct_range_header(
     Ok(match downloaded_bytes {
         Some(remaining_bytes) => HeaderMap::from_iter([(
             RANGE,
-            HeaderValue::from_str(format!("bytes={}-", remaining_bytes).as_str())
+            HeaderValue::from_str(format!("bytes={remaining_bytes}-").as_str())
                 .map_err(|e| e.to_string())?,
         )])
         .into(),

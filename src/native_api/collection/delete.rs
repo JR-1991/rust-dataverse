@@ -46,7 +46,7 @@ pub async fn delete_collection(
     alias: &str,
 ) -> Result<Response<CollectionDeleteResponse>, String> {
     // Endpoint metadata
-    let url = format!("/api/dataverses/{}", alias);
+    let url = format!("/api/dataverses/{alias}");
 
     // Send request
     let context = RequestType::Plain;

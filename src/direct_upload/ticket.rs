@@ -35,7 +35,7 @@ pub(crate) async fn get_ticket(
             parameters.insert("persistentId".to_string(), pid);
             "/api/datasets/:persistentId/uploadurls".to_string()
         }
-        Identifier::Id(db_id) => format!("/api/datasets/{}/uploadurls", db_id),
+        Identifier::Id(db_id) => format!("/api/datasets/{db_id}/uploadurls"),
     };
 
     parameters.insert("size".to_string(), file_size.to_string());

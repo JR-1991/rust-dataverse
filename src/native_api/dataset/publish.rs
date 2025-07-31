@@ -33,7 +33,7 @@ impl FromStr for Version {
             "major" => Ok(Version::Major),
             "minor" => Ok(Version::Minor),
             "updatecurrent" => Ok(Version::UpdateCurrent),
-            _ => Err(format!("Invalid version: {}", s)),
+            _ => Err(format!("Invalid version: {s}")),
         }
     }
 }

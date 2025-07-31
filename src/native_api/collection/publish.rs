@@ -46,7 +46,7 @@ pub async fn publish_collection(
     alias: &str,
 ) -> Result<Response<CollectionCreateResponse>, String> {
     // Endpoint metadata
-    let url = format!("api/dataverses/{}/actions/:publish", alias);
+    let url = format!("api/dataverses/{alias}/actions/:publish");
 
     // Send request
     let context = RequestType::Plain;
