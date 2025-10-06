@@ -67,7 +67,7 @@ mod tests {
             std::fs::read_to_string("tests/fixtures/external_tool_test.json").unwrap();
         let manifest: tools::manifest::ExternalToolManifest =
             serde_json::from_str(&manifest_content).unwrap();
-        let response = tools::add::register_external_tool(&client, manifest).await;
+        let response = tools::add::register_external_tool(&client, manifest, false).await;
         assert!(response.is_ok());
 
         // Act
