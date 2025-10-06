@@ -120,6 +120,6 @@
       "description": "Resources your tool needs to function. Currently, requirements only apply to preview tools"
     }
   },
-  "required": ["displayName", "scope", "toolUrl"],
+  "required": ["displayName", "scope", "toolUrl", "toolName"],
   "additionalProperties": false
 }
