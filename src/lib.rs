@@ -106,6 +106,8 @@ pub mod native_api {
             pub mod list;
             /// Tool manifest
             pub(crate) mod manifest;
+            /// Tool removal
+            pub mod remove;
         }
     }
 
