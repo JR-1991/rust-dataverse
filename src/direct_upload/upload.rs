@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
+use std::hash::Hash;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -29,7 +30,7 @@ use super::ticket::{MultiPartTicket, SinglePartTicket, TicketResponse};
 import_types!(
     schema = "models/direct_upload/upload.json",
     struct_builder = true,
-    derives = [Default]
+    derives = [Eq, PartialEq, Hash],
 );
 
 /// A batch of direct upload bodies.
@@ -40,7 +41,7 @@ import_types!(
 /// # Fields
 ///
 /// * `body` - The vector of direct upload bodies
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, Eq, PartialEq, Hash)]
 pub struct BatchDirectUploadBody(pub Vec<DirectUploadBody>);
 
 impl From<Vec<DirectUploadBody>> for BatchDirectUploadBody {
@@ -157,6 +158,12 @@ pub async fn batch_direct_upload(
     } else {
         vec![None; files.len()]
     };
+
+    // Convert the bodies to a vector of direct upload bodies
+    let bodies: Vec<DirectUploadBody> = bodies.into_iter().map(Into::into).collect();
+
+    // Check for duplicate bodies
+    check_duplicate_bodies(&bodies)?;
 
     // Cleanup before starting the upload
     cleanup_expired_and_complete_uploads(&pool).await?;
@@ -296,6 +303,7 @@ async fn direct_upload_core(
             body.storage_identifier = Some(storage_id);
 
             add_checksum(&mut body, &file_hash_algo, file_hash).map_err(|e| e.to_string())?;
+            return Ok(body);
         }
     }
 
@@ -437,7 +445,9 @@ async fn upload_multi_part(
     .map_err(|e| e.to_string())?;
 
     // Upload the remaining parts
-    let hash_task = hash_and_store(&upload, pool, hasher, file);
+    // Clone the hasher to avoid race conditions between concurrent tasks
+    let hasher_clone = hasher.clone();
+    let hash_task = hash_and_store(&upload, pool, &hasher_clone, file);
     let upload_task = upload_remaining_parts(client, pool, &upload, callbacks);
 
     let (_, _) = tokio::join!(hash_task, upload_task);
@@ -725,6 +735,29 @@ async fn cleanup_expired_and_complete_uploads(pool: &Pool<Sqlite>) -> Result<(),
     Ok(())
 }
 
+/// Checks for duplicate bodies in a vector of direct upload bodies.
+///
+/// This function checks for duplicate bodies in a vector of direct upload bodies.
+///
+/// # Arguments
+///
+/// * `bodies` - The vector of direct upload bodies to check
+///
+/// # Returns
+///
+/// A `Result` containing either:
+/// * `()` - Indicates successful check
+/// * `String` - An error message if a duplicate body is found
+pub(crate) fn check_duplicate_bodies(bodies: &[DirectUploadBody]) -> Result<(), String> {
+    let mut seen = HashSet::with_capacity(bodies.len());
+    for body in bodies {
+        if !seen.insert(body) {
+            return Err(format!("Duplicate body found: {:?}", body));
+        }
+    }
+    Ok(())
+}
+
 /// This enum is used to determine the test mode for the upload.
 ///
 /// We need to handle this because, when using a dockerized version of
@@ -806,7 +839,7 @@ mod tests {
 
     use crate::{
         direct_upload::model::Part,
-        prelude::dataset::get_dataset_meta,
+        prelude::dataset::list_dataset_files,
         test_utils::{
             create_test_collection, create_test_dataset, extract_test_env, set_storage_backend,
         },
@@ -874,15 +907,12 @@ mod tests {
 
         // ASSERT
         // Verify the file was uploaded successfully
-        let files = get_dataset_meta(&client, &Identifier::PersistentId(pid), &None)
+        let files = list_dataset_files(&client, &Identifier::PersistentId(pid), &None)
             .await
-            .expect("Failed to fetch dataset metadata");
+            .expect("Failed to fetch dataset files");
 
-        assert_eq!(
-            files.data.expect("No data").files.len(),
-            1,
-            "Expected exactly one file in the dataset"
-        );
+        let data = files.data.expect("No dataset data returned");
+        assert_eq!(data.0.len(), 1, "Expected exactly one file in the dataset");
     }
 
     #[tokio::test]
@@ -923,20 +953,19 @@ mod tests {
 
         // ASSERT
         // Verify file upload and checksum
-        let files = get_dataset_meta(&client, &Identifier::PersistentId(pid), &None)
+        let files = list_dataset_files(&client, &Identifier::PersistentId(pid), &None)
             .await
             .expect("Failed to fetch dataset metadata");
 
         let data = files.data.expect("No dataset data returned");
-        assert_eq!(
-            data.files.len(),
-            1,
-            "Expected exactly one file in the dataset"
-        );
+        assert_eq!(data.0.len(), 1, "Expected exactly one file in the dataset");
 
-        let file = &data.files[0];
-        let data_file = file.data_file.as_ref().expect("No data file present");
-        let checksum = data_file.checksum.as_ref().expect("No checksum present");
+        let (_, data_file) = data.0.iter().next().expect("No files in dataset");
+        let checksum = data_file
+            .data_file
+            .as_ref()
+            .and_then(|df| df.checksum.as_ref())
+            .expect("No checksum present");
 
         assert_eq!(
             checksum.value.as_ref().expect("No checksum value"),
@@ -969,9 +998,14 @@ mod tests {
         std::fs::create_dir_all("tests/fixtures")
             .expect("Failed to create tests/fixtures directory");
 
-        // Write test data to the file
-        let file_path = PathBuf::from("tests/fixtures/direct_upload.txt");
+        // Write test data to the file with unique name for this test
+        let file_path = PathBuf::from("tests/fixtures/direct_upload_large.txt");
         std::fs::write(&file_path, &data).expect("Failed to write data to test file");
+
+        // Ensure the file is fully written to disk before proceeding
+        std::fs::File::open(&file_path)
+            .and_then(|f| f.sync_all())
+            .expect("Failed to sync file to disk");
 
         let expected_hash = format!("{:x}", md5::compute(std::fs::read(&file_path).unwrap()));
 
@@ -996,20 +1030,19 @@ mod tests {
 
         // ASSERT
         // Verify file upload and checksum
-        let files = get_dataset_meta(&client, &Identifier::PersistentId(pid), &None)
+        let files = list_dataset_files(&client, &Identifier::PersistentId(pid), &None)
             .await
-            .expect("Failed to fetch dataset metadata");
+            .expect("Failed to fetch dataset files");
 
         let data = files.data.expect("No dataset data returned");
-        assert_eq!(
-            data.files.len(),
-            1,
-            "Expected exactly one file in the dataset"
-        );
+        assert_eq!(data.0.len(), 1, "Expected exactly one file in the dataset");
 
-        let file = &data.files[0];
-        let data_file = file.data_file.as_ref().expect("No data file present");
-        let checksum = data_file.checksum.as_ref().expect("No checksum present");
+        let (_, data_file) = data.0.iter().next().expect("No files in dataset");
+        let checksum = data_file
+            .data_file
+            .as_ref()
+            .and_then(|df| df.checksum.as_ref())
+            .expect("No checksum present");
 
         assert_eq!(
             checksum.value.as_ref().expect("No checksum value"),
@@ -1042,12 +1075,18 @@ mod tests {
         std::fs::create_dir_all("tests/fixtures")
             .expect("Failed to create tests/fixtures directory");
 
-        // Write test data to the file
+        // Write test data to the files
         let file1_path = PathBuf::from("tests/fixtures/direct_upload.txt");
         std::fs::write(&file1_path, &data).expect("Failed to write data to test file");
+        std::fs::File::open(&file1_path)
+            .and_then(|f| f.sync_all())
+            .expect("Failed to sync file1 to disk");
 
         let file2_path = PathBuf::from("tests/fixtures/direct_upload2.txt");
         std::fs::write(&file2_path, &data).expect("Failed to write data to test file");
+        std::fs::File::open(&file2_path)
+            .and_then(|f| f.sync_all())
+            .expect("Failed to sync file2 to disk");
 
         let expected_hash1 = format!("{:x}", md5::compute(std::fs::read(&file1_path).unwrap()));
         let expected_hash2 = format!("{:x}", md5::compute(std::fs::read(&file2_path).unwrap()));
@@ -1080,22 +1119,21 @@ mod tests {
 
         // ASSERT
         // Verify file upload and checksum
-        let files = get_dataset_meta(&client, &Identifier::PersistentId(pid), &None)
+        let files = list_dataset_files(&client, &Identifier::PersistentId(pid), &None)
             .await
-            .expect("Failed to fetch dataset metadata");
+            .expect("Failed to fetch dataset files");
 
         let data = files.data.expect("No dataset data returned");
-        assert_eq!(
-            data.files.len(),
-            2,
-            "Expected exactly two files in the dataset"
-        );
+        assert_eq!(data.0.len(), 2, "Expected exactly two files in the dataset");
 
         let expected_hashes = [expected_hash1, expected_hash2];
 
-        for (file, expected_hash) in data.files.iter().zip(expected_hashes.iter()) {
-            let data_file = file.data_file.as_ref().expect("No data file present");
-            let checksum = data_file.checksum.as_ref().expect("No checksum present");
+        for ((_, data_file), expected_hash) in data.0.iter().zip(expected_hashes.iter()) {
+            let checksum = data_file
+                .data_file
+                .as_ref()
+                .and_then(|df| df.checksum.as_ref())
+                .expect("No checksum present");
 
             assert_eq!(
                 checksum.value.as_ref().expect("No checksum value"),
@@ -1109,6 +1147,9 @@ mod tests {
     #[should_panic]
     async fn test_duplicate_batch_upload() {
         // ARRANGE
+        // Set the database path to a temporary directory
+        set_test_db_path();
+
         // Set up test environment and client
         let (client, pid) = setup_direct_upload("LocalStack").await;
         set_test_mode("LocalStack");
@@ -1127,12 +1168,14 @@ mod tests {
         std::fs::create_dir_all("tests/fixtures")
             .expect("Failed to create tests/fixtures directory");
 
-        // Write test data to the file
-        let file1_path = PathBuf::from("tests/fixtures/direct_upload.txt");
+        // Write test data to the files with unique names for this test
+        let file1_path = PathBuf::from("tests/fixtures/direct_upload_dup1.txt");
         std::fs::write(&file1_path, &data).expect("Failed to write data to test file");
+        std::fs::File::open(&file1_path)
+            .and_then(|f| f.sync_all())
+            .expect("Failed to sync file1 to disk");
 
-        let file2_path = PathBuf::from("tests/fixtures/direct_upload.txt");
-        std::fs::write(&file2_path, &data).expect("Failed to write data to test file");
+        // We will now pass the same file path twice
 
         let body1 = DirectUploadBody {
             file_name: Some("direct_upload.txt".to_string()),
@@ -1152,7 +1195,7 @@ mod tests {
             .client(&client)
             .id(id)
             .hasher("MD5")
-            .files(vec![file1_path, file2_path])
+            .files(vec![file1_path.clone(), file1_path])
             .bodies(vec![body1, body2])
             .n_parallel_uploads(2)
             .call()
