@@ -57,6 +57,14 @@ pub enum AdminSubCommand {
         /// The tool manifest to register
         #[structopt(help = "Path to the tool manifest file")]
         manifest: PathBuf,
+
+        /// Whether to overwrite an existing tool when it already exists. This will delete the existing tool and register a new one.
+        #[structopt(
+            short,
+            long,
+            help = "Whether to overwrite an existing tool when it already exists. This will delete the existing tool and register a new one."
+        )]
+        overwrite: bool,
     },
 
     /// List all external tools
@@ -105,12 +113,16 @@ impl Matcher for AdminSubCommand {
                     runtime.block_on(storage::reset_collection_storage_driver(client, &alias));
                 evaluate_and_print_response(response);
             }
-            AdminSubCommand::AddExternalTool { manifest } => {
+            AdminSubCommand::AddExternalTool {
+                manifest,
+                overwrite,
+            } => {
                 let manifest_content = std::fs::read_to_string(manifest).unwrap();
                 let manifest: tools::manifest::ExternalToolManifest =
                     serde_json::from_str(&manifest_content).unwrap();
-                let response =
-                    runtime.block_on(tools::add::register_external_tool(client, manifest));
+                let response = runtime.block_on(tools::add::register_external_tool(
+                    client, manifest, overwrite,
+                ));
                 evaluate_and_print_response(response);
             }
             AdminSubCommand::ListExternalTools {} => {
