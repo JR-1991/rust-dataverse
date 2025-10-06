@@ -6,7 +6,12 @@
 //! - Validating authentication inputs like URLs and tokens
 //! - Retrieving stored credentials for API requests
 
+use std::io::{self, Write};
+
+use colored::Colorize;
+use dialoguer::Input;
 use keyring::{Entry, Result};
+use rpassword::prompt_password;
 use structopt::StructOpt;
 use url::Url;
 use uuid::Uuid;
@@ -14,6 +19,60 @@ use uuid::Uuid;
 use crate::client::BaseClient;
 
 use super::base::Matcher;
+
+/// Interactively prompts the user for Dataverse URL and API token
+///
+/// # Returns
+/// A tuple containing (url, token) where:
+/// - url: String - The Dataverse server URL
+/// - token: String - The API token (may be empty if user skips)
+///
+/// # Errors
+/// Returns an error if there are issues with user input or I/O operations
+pub fn prompt_for_credentials() -> std::result::Result<(String, String), Box<dyn std::error::Error>>
+{
+    println!(
+        "\n{}",
+        "🔗 Setting up Dataverse connection...".bold().cyan()
+    );
+    println!("{}", "─".repeat(50).dimmed());
+
+    // Get URL interactively
+    let base_url: String = Input::new()
+        .with_prompt(&format!(
+            "{} {}",
+            "🌐".bold(),
+            "Enter Dataverse server URL".bold().green()
+        ))
+        .default("https://demo.dataverse.org".to_string())
+        .show_default(true)
+        .interact_text()?;
+
+    // Get token interactively with masking
+    println!(
+        "\n{} {}",
+        "🔑".bold(),
+        "Enter API token (optional - press Enter to skip)"
+            .bold()
+            .green()
+    );
+    println!("{}", "   Token will be hidden for security".dimmed());
+    print!("{} ", "Token:".bold().yellow());
+    io::stdout().flush()?;
+    let api_token = prompt_password("")?;
+
+    if !api_token.trim().is_empty() {
+        println!("{}", "✓ Token received".green());
+    } else {
+        println!(
+            "{}",
+            "⚠ No token provided - some operations may be limited".yellow()
+        );
+    }
+
+    println!("{}", "─".repeat(50).dimmed());
+    Ok((base_url, api_token))
+}
 
 /// Subcommands for handling authentication in the Dataverse CLI
 #[derive(StructOpt, Debug)]
@@ -24,16 +83,86 @@ pub enum AuthSubCommand {
     Set {
         /// Name to identify this authentication profile
         #[structopt(short, long, help = "Name of the profile")]
-        name: String,
+        name: Option<String>,
 
         /// URL of the Dataverse server to authenticate against
         #[structopt(short, long, help = "URL of the Dataverse server")]
-        url: String,
+        url: Option<String>,
 
         /// API token used for authentication with the Dataverse server
         #[structopt(short, long, help = "API token for authentication")]
-        token: String,
+        token: Option<String>,
     },
+}
+
+/// Gets the profile name, prompting if not provided
+fn get_profile_name(
+    name: Option<String>,
+) -> std::result::Result<String, Box<dyn std::error::Error>> {
+    match name {
+        Some(n) => Ok(n),
+        None => {
+            println!("\n{}", "📝 Profile Setup".bold().cyan());
+            println!("{}", "─".repeat(30).dimmed());
+            let profile_name = Input::new()
+                .with_prompt(&format!(
+                    "{} {}",
+                    "👤".bold(),
+                    "Enter profile name".bold().green()
+                ))
+                .interact_text()?;
+            Ok(profile_name)
+        }
+    }
+}
+
+/// Gets credentials, using provided values or prompting interactively
+fn get_credentials(
+    url: Option<String>,
+    token: Option<String>,
+) -> std::result::Result<(String, String), Box<dyn std::error::Error>> {
+    match (&url, &token) {
+        (Some(u), Some(t)) => Ok((u.clone(), t.clone())),
+        _ => {
+            let (interactive_url, interactive_token) = prompt_for_credentials()?;
+            let final_url = url.unwrap_or(interactive_url);
+            let final_token = token.unwrap_or(interactive_token);
+            Ok((final_url, final_token))
+        }
+    }
+}
+
+/// Creates and stores an authentication profile
+fn create_and_store_profile(name: String, url: String, token: String) {
+    println!("\n{}", "💾 Saving profile...".bold().cyan());
+
+    match AuthProfile::new(name.clone(), url, token) {
+        Ok(profile) => match profile.set_to_keyring() {
+            Ok(_) => {
+                println!("{}", "─".repeat(50).dimmed());
+                println!(
+                    "{} Profile '{}' saved successfully!",
+                    "✅".bold(),
+                    name.bold().green()
+                );
+                println!(
+                    "   You can now use it with: {}",
+                    format!("--profile {}", name).dimmed().italic()
+                );
+                println!("{}", "─".repeat(50).dimmed());
+            }
+            Err(e) => {
+                println!(
+                    "{} Failed to save profile to keyring: {}",
+                    "❌".bold(),
+                    e.to_string().red()
+                );
+            }
+        },
+        Err(e) => {
+            println!("{} Failed to create profile: {}", "❌".bold(), e.red());
+        }
+    }
 }
 
 /// Implementation of the Matcher trait for AuthSubCommand to process authentication commands
@@ -45,20 +174,37 @@ impl Matcher for AuthSubCommand {
     ///
     /// # Implementation Details
     /// This function:
-    /// 1. Creates a new AuthProfile from the provided credentials
-    /// 2. Attempts to store the profile in the system keyring
-    /// 3. Prints success/failure message to the user
+    /// 1. Gets the profile name (from args or prompt)
+    /// 2. Gets credentials (from args or interactive prompt)
+    /// 3. Creates and stores the profile in the system keyring
     fn process(self, _client: &BaseClient) {
         match self {
             AuthSubCommand::Set { name, url, token } => {
-                let auth_profile =
-                    AuthProfile::new(name.clone(), url.clone(), token.clone()).unwrap();
-                let response = auth_profile.set_to_keyring();
+                let profile_name = match get_profile_name(name) {
+                    Ok(name) => name,
+                    Err(e) => {
+                        println!(
+                            "{} Failed to get profile name: {}",
+                            "❌".bold(),
+                            e.to_string().red()
+                        );
+                        return;
+                    }
+                };
 
-                match response {
-                    Ok(_) => println!("Profile set successfully"),
-                    Err(e) => println!("Failed to set profile: {}", e),
-                }
+                let (final_url, final_token) = match get_credentials(url, token) {
+                    Ok(credentials) => credentials,
+                    Err(e) => {
+                        println!(
+                            "{} Failed to get credentials: {}",
+                            "❌".bold(),
+                            e.to_string().red()
+                        );
+                        return;
+                    }
+                };
+
+                create_and_store_profile(profile_name, final_url, final_token);
             }
         }
     }

@@ -2,7 +2,7 @@ use std::error::Error;
 
 use colored::Colorize;
 use dataverse::cli::admin::AdminSubCommand;
-use dataverse::cli::auth::{AuthProfile, AuthSubCommand};
+use dataverse::cli::auth::{prompt_for_credentials, AuthProfile, AuthSubCommand};
 use structopt::StructOpt;
 
 use dataverse::cli::base::Matcher;
@@ -60,7 +60,13 @@ fn main() {
 
     let client = match cli.global.profile {
         Some(profile) => setup_client_from_keyring(&profile).expect("Failed to set up client."),
-        None => setup_client_from_env().expect("Failed to set up client."),
+        None => {
+            // Try environment variables first, if not available, prompt for interactive input
+            match setup_client_from_env() {
+                Ok(client) => client,
+                Err(_) => setup_client_from_input().expect("Failed to set up client."),
+            }
+        }
     };
 
     if atty::is(atty::Stream::Stdout) {
@@ -90,6 +96,19 @@ fn setup_client_from_keyring(name: &str) -> Result<BaseClient, Box<dyn Error>> {
 
 fn setup_client_from_env() -> Result<BaseClient, Box<dyn Error>> {
     let (base_url, api_token) = extract_config_from_env();
+    let client = BaseClient::new(&base_url, api_token.as_ref())?;
+    Ok(client)
+}
+
+fn setup_client_from_input() -> Result<BaseClient, Box<dyn Error>> {
+    let (base_url, api_token_str) = prompt_for_credentials()?;
+
+    let api_token = if api_token_str.trim().is_empty() {
+        None
+    } else {
+        Some(api_token_str)
+    };
+
     let client = BaseClient::new(&base_url, api_token.as_ref())?;
     Ok(client)
 }
