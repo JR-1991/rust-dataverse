@@ -10,7 +10,7 @@ use crate::check_lock;
 use crate::direct_upload::hasher::{FileHash, Hasher};
 use crate::file::callback::CallbackFun;
 use crate::file::uploadfile::UploadFile;
-use crate::native_api::dataset::get_dataset_meta;
+use crate::prelude::dataset::list_dataset_files;
 use crate::prelude::DatasetVersion;
 use crate::{
     client::{evaluate_response, BaseClient},
@@ -183,19 +183,13 @@ pub async fn file_exists_at_dataset(
         hasher.compute().map_err(|e| e.to_string())
     })?;
 
-    // Fetch the dataset metadata
-    let mut dataset_response = get_dataset_meta(client, id, &version).await?;
-
-    if dataset_response.status.is_err() {
-        // Try again with Latest version
-        dataset_response = get_dataset_meta(client, id, &Some(DatasetVersion::Latest)).await?;
-    }
-
-    let dataset = dataset_response
+    // Fetch the dataset files
+    let files = list_dataset_files(client, id, &version)
+        .await?
         .data
         .ok_or(format!("Dataset '{}' not found", id))?;
 
-    for file in dataset.files {
+    for (_, file) in files.0 {
         let label = file.label.ok_or("No label found")?;
         let data_file = file.data_file.ok_or("No 'data_file' found")?;
         let file_md5 = data_file.md5.ok_or("No MD5 checksum found")?;

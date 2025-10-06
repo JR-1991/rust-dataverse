@@ -33,7 +33,7 @@ pub async fn list_external_tools(
     client: &BaseClient,
 ) -> Result<Response<Vec<ExternalToolResponse>>, String> {
     // Endpoint metadata
-    let url = format!("api/admin/externalTools");
+    let url = "api/admin/externalTools".to_string();
 
     // Send request
     let context = RequestType::Plain;
@@ -77,7 +77,7 @@ mod tests {
 
         // Assert
         let tools = response.data.clone().unwrap();
-        assert!(tools.len() > 0);
+        assert!(!tools.is_empty());
 
         // Check if there's a tool with the name "fabulous"
         let has_fabulous_tool = tools

@@ -37,7 +37,7 @@ pub async fn get_dataset_meta(
         }
     } else {
         match id {
-            Identifier::PersistentId(_) => format!("api/datasets/:persistentId"),
+            Identifier::PersistentId(_) => "api/datasets/:persistentId".to_string(),
             Identifier::Id(_) => format!("api/datasets/{id}"),
         }
     };

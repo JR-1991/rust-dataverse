@@ -39,7 +39,7 @@ pub fn prompt_for_credentials() -> std::result::Result<(String, String), Box<dyn
 
     // Get URL interactively
     let base_url: String = Input::new()
-        .with_prompt(&format!(
+        .with_prompt(format!(
             "{} {}",
             "🌐".bold(),
             "Enter Dataverse server URL".bold().green()
@@ -95,25 +95,38 @@ pub enum AuthSubCommand {
     },
 }
 
-/// Gets the profile name, prompting if not provided
+/// Retrieves the profile name for authentication configuration.
+///
+/// This function efficiently handles profile name acquisition by either returning
+/// the provided parameter directly or prompting the user through an interactive
+/// interface. The interactive mode provides clear visual feedback and consistent
+/// styling to enhance the user experience during profile setup.
+///
+/// # Arguments
+///
+/// * `name` - An optional string containing the profile name
+///
+/// # Returns
+///
+/// A `Result` containing the profile name or an error from user interaction
 fn get_profile_name(
     name: Option<String>,
 ) -> std::result::Result<String, Box<dyn std::error::Error>> {
-    match name {
-        Some(n) => Ok(n),
-        None => {
-            println!("\n{}", "📝 Profile Setup".bold().cyan());
-            println!("{}", "─".repeat(30).dimmed());
-            let profile_name = Input::new()
-                .with_prompt(&format!(
-                    "{} {}",
-                    "👤".bold(),
-                    "Enter profile name".bold().green()
-                ))
-                .interact_text()?;
-            Ok(profile_name)
-        }
+    if let Some(profile_name) = name {
+        return Ok(profile_name);
     }
+
+    println!("\n{}", "📝 Profile Setup".bold().cyan());
+    println!("{}", "─".repeat(30).dimmed());
+
+    Input::new()
+        .with_prompt(format!(
+            "{} {}",
+            "👤".bold(),
+            "Enter profile name".bold().green()
+        ))
+        .interact_text()
+        .map_err(Into::into)
 }
 
 /// Gets credentials, using provided values or prompting interactively

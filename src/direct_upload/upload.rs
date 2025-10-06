@@ -154,7 +154,7 @@ pub async fn batch_direct_upload(
         if callbacks.len() != files.len() {
             return Err("Number of callbacks does not match number of files".to_string());
         }
-        callbacks.into_iter().map(|cb| Some(cb)).collect()
+        callbacks.into_iter().map(Some).collect()
     } else {
         vec![None; files.len()]
     };
@@ -191,7 +191,7 @@ pub async fn batch_direct_upload(
         let client_clone = client.clone();
         let id_clone = arc_id.clone();
         let hasher_clone = hasher.clone();
-        let body_clone = file_body.into();
+        let body_clone = file_body;
 
         // Spawn a task for each file upload
         let handle = tokio::spawn(async move {

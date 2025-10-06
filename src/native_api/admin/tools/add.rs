@@ -44,7 +44,7 @@ pub async fn register_external_tool(
     body: ExternalToolManifest,
 ) -> Result<Response<ExternalToolResponse>, String> {
     // Endpoint metadata
-    let url = format!("api/admin/externalTools");
+    let url = "api/admin/externalTools".to_string();
 
     // Build body
     let body = serde_json::to_string(&body).unwrap();

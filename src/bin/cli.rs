@@ -62,9 +62,10 @@ fn main() {
         Some(profile) => setup_client_from_keyring(&profile).expect("Failed to set up client."),
         None => {
             // Try environment variables first, if not available, prompt for interactive input
-            match setup_client_from_env() {
-                Ok(client) => client,
-                Err(_) => setup_client_from_input().expect("Failed to set up client."),
+            if let Ok(client) = setup_client_from_env() {
+                client
+            } else {
+                setup_client_from_input().expect("Failed to set up client.")
             }
         }
     };
@@ -95,7 +96,7 @@ fn setup_client_from_keyring(name: &str) -> Result<BaseClient, Box<dyn Error>> {
 }
 
 fn setup_client_from_env() -> Result<BaseClient, Box<dyn Error>> {
-    let (base_url, api_token) = extract_config_from_env();
+    let (base_url, api_token) = extract_config_from_env()?;
     let client = BaseClient::new(&base_url, api_token.as_ref())?;
     Ok(client)
 }
@@ -115,14 +116,14 @@ fn setup_client_from_input() -> Result<BaseClient, Box<dyn Error>> {
 
 // This function extracts the base URL and API token from the environment
 // variables DVCLI_URL and DVCLI_TOKEN, respectively.
-fn extract_config_from_env() -> (String, Option<String>) {
+fn extract_config_from_env() -> Result<(String, Option<String>), Box<dyn Error>> {
     let base_url = std::env::var("DVCLI_URL").ok();
     let api_token = std::env::var("DVCLI_TOKEN").ok();
 
     // If there is no base URL, return None
     if base_url.is_none() {
-        panic!("Neither profile name nor base URL provided. Please set the DVCLI_URL environment variable or use a profile name with the --profile flag.");
+        return Err("Neither profile name nor base URL provided. Please set the DVCLI_URL environment variable or use a profile name with the --profile flag.".into());
     }
 
-    (base_url.unwrap(), api_token)
+    Ok((base_url.unwrap(), api_token))
 }

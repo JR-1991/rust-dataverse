@@ -385,7 +385,7 @@ impl Matcher for DatasetSubCommand {
 
                 let response = runtime.block_on(
                     direct_upload::batch_direct_upload()
-                        .client(&client)
+                        .client(client)
                         .id(id)
                         .files(paths)
                         .bodies(bodies)

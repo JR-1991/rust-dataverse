@@ -87,7 +87,7 @@ impl AsyncWrite for ZipStream {
             sender
                 .send(data)
                 .await
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+                .map_err(io::Error::other)
         };
 
         // Pin the future

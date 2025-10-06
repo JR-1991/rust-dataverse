@@ -64,7 +64,7 @@ impl Matcher for InfoSubCommand {
                             for (key, exporter) in exporters.iter() {
                                 println!("  - {}: {}", key.bold().blue(), exporter.display_name);
                             }
-                            println!("{}", EXPORTERS_INSTRUCTIONS.to_string());
+                            println!("{}", *EXPORTERS_INSTRUCTIONS);
                         } else {
                             eprintln!("Error: {}", response.message.unwrap());
                         }
