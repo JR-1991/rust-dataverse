@@ -1,13 +1,21 @@
 [package]
-name = "dataverse"
+name = "rust-dataverse"
 version = "0.1.1"
 edition = "2021"
+repository = "https://github.com/gdcc/rust-dataverse"
+license = "MIT"
+authors = ["Jan Range <jan.range@simtech.uni-stuttgart.de>"]
+description = "A Rust library for interacting with the Dataverse API."
+documentation = "https://guides.dataverse.org/en/latest/"
+
+[lib]
+name = "dataverse"
+path = "src/lib.rs"
 
 [dependencies]
 clap = { version = "4.5.4", features = ["derive", "cargo"] }
 colored = "3.0.0"
 exitcode = "1.1.2"
-regress = "0.10.0"
 reqwest = { version = "0.12.4", features = [
     "blocking",
     "json",
@@ -17,18 +25,18 @@ reqwest = { version = "0.12.4", features = [
 serde = { version = "1.0.201", features = ["derive"] }
 serde_json = "1.0.117"
 serde_yaml = "0.9.34"
-typify = "0.2.0"
+typify = "0.4.3"
 colored_json = "5.0.0"
 structopt = "0.3.26"
 atty = "0.2.14"
-indicatif = "0.17.8"
+indicatif = "0.18.0"
 tokio = { version = "1.37.0", features = ["full"] }
 tokio-util = "0.7.11"
 bytes = "1.6.0"
 futures = "0.3.30"
-md5 = "0.7.0"
+md5 = "0.8.0"
 tokio-stream = "0.1.16"
-async_zip = { version = "0.0.17", features = ["tokio", "deflate"] }
+async_zip = { version = "0.0.18", features = ["tokio", "deflate"] }
 walkdir = "2.5.0"
 chrono = { version = "0.4.31", features = ["serde"] }
 keyring = { version = "3.6.1", features = [
@@ -47,6 +55,8 @@ dirs = "6.0.0"
 mime_guess = "2.0.5"
 infer = "0.19.0"
 bon = "3.6.3"
+rpassword = "7.3.1"
+dialoguer = "0.11.0"
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 libdbus-sys = { version = "0.2.5", features = ["vendored"] }
@@ -56,6 +66,11 @@ name = "dvcli"
 path = "src/bin/cli.rs"
 
 [dev-dependencies]
-httpmock = "0.7.0"
+httpmock = "0.8.1"
 rand = "0.9.0-alpha.1"
 tempfile = "3.19.1"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
