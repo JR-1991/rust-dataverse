@@ -212,9 +212,10 @@ impl Upload {
         let path = path.into();
         let pid = pid.into();
         let md5_hash = md5::compute(format!(
-            "{base_url}-{path}-{pid}-{size}-{file_hash_algo}"
+            "{}-{}-{}-{}-{}",
+            base_url, path, pid, size, file_hash_algo
         ));
-        format!("{md5_hash:x}")
+        format!("{:x}", md5_hash)
     }
 
     /// Creates a new upload instance from a MultiPartTicket

@@ -50,7 +50,7 @@ pub async fn delete_dataset(
     id: &i64,
 ) -> Result<Response<UnpublishedDatasetDeleteResponse>, String> {
     // Endpoint metadata
-    let url = format!("/api/datasets/{id}");
+    let url = format!("/api/datasets/{}", id);
 
     // Send request
     let context = RequestType::Plain;

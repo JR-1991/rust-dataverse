@@ -55,7 +55,7 @@ pub async fn create_collection(
     body: CollectionCreateBody,
 ) -> Result<Response<CollectionCreateResponse>, String> {
     // Endpoint metadata
-    let url = format!("api/dataverses/{parent}");
+    let url = format!("api/dataverses/{}", parent);
 
     // Build body
     let body = serde_json::to_string(&body).unwrap();

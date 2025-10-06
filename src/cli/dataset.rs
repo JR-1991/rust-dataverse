@@ -12,6 +12,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use chrono::ParseResult;
 use colored_json::Paint;
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
@@ -385,7 +386,7 @@ impl Matcher for DatasetSubCommand {
 
                 let response = runtime.block_on(
                     direct_upload::batch_direct_upload()
-                        .client(client)
+                        .client(&client)
                         .id(id)
                         .files(paths)
                         .bodies(bodies)
@@ -430,7 +431,7 @@ impl Matcher for DatasetSubCommand {
                 };
 
                 if let Err(e) = response {
-                    eprintln!("Error: {e}");
+                    eprintln!("Error: {}", e);
                 }
             }
             DatasetSubCommand::Export {
@@ -450,7 +451,7 @@ impl Matcher for DatasetSubCommand {
                         }
                     },
                     Err(e) => {
-                        eprintln!("Error: {e}");
+                        eprintln!("Error: {}", e);
                         return;
                     }
                 };
@@ -718,7 +719,7 @@ impl DatasetSubCommand {
             .map(String::from)
             .unwrap_or_default();
 
-        let mime = infer_mime(path).map_err(|e| format!("Failed to infer mime type. Direct upload only supports files with known mime types. Error: {e}"))?;
+        let mime = infer_mime(path).map_err(|e| format!("Failed to infer mime type. Direct upload only supports files with known mime types. Error: {}", e))?;
 
         Ok(DirectUploadBody {
             file_name: Some(filename),

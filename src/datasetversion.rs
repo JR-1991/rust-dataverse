@@ -56,7 +56,7 @@ impl Display for DatasetVersion {
             DatasetVersion::Latest => write!(f, ":latest"),
             DatasetVersion::Draft => write!(f, ":draft"),
             DatasetVersion::LatestPublished => write!(f, ":latest-published"),
-            DatasetVersion::Version(v) => write!(f, "{v}"),
+            DatasetVersion::Version(v) => write!(f, "{}", v),
         }
     }
 }

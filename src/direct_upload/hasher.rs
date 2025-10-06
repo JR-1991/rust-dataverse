@@ -675,24 +675,24 @@ mod tests {
                 "MD5" => {
                     let expected_hash = format!("{:x}", md5::compute(content));
                     let hash = hasher.compute().unwrap();
-                    assert_eq!(hash, expected_hash, "Hash for {algorithm} is incorrect");
+                    assert_eq!(hash, expected_hash, "Hash for {} is incorrect", algorithm);
                 }
                 "SHA-256" => {
                     let expected_hash = format!("{:x}", sha2::Sha256::digest(content));
                     let hash = hasher.compute().unwrap();
-                    assert_eq!(hash, expected_hash, "Hash for {algorithm} is incorrect");
+                    assert_eq!(hash, expected_hash, "Hash for {} is incorrect", algorithm);
                 }
                 "SHA-512" => {
                     let expected_hash = format!("{:x}", sha2::Sha512::digest(content));
                     let hash = hasher.compute().unwrap();
-                    assert_eq!(hash, expected_hash, "Hash for {algorithm} is incorrect");
+                    assert_eq!(hash, expected_hash, "Hash for {} is incorrect", algorithm);
                 }
                 "SHA-1" => {
                     let expected_hash = format!("{:x}", sha1::Sha1::digest(content));
                     let hash = hasher.compute().unwrap();
-                    assert_eq!(hash, expected_hash, "Hash for {algorithm} is incorrect");
+                    assert_eq!(hash, expected_hash, "Hash for {} is incorrect", algorithm);
                 }
-                _ => panic!("Unsupported algorithm: {algorithm}"),
+                _ => panic!("Unsupported algorithm: {}", algorithm),
             }
         }
     }

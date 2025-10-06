@@ -192,7 +192,7 @@ mod tests {
 
         // Check that the file has the correct MD5 hash
         let file_md5_hash = md5::compute(file_content);
-        assert_eq!(format!("{file_md5_hash:x}"), expected_md5_hash);
+        assert_eq!(format!("{:x}", file_md5_hash), expected_md5_hash);
     }
 
     #[tokio::test]

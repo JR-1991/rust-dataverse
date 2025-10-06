@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::datasetversion::determine_version;
 use crate::prelude::DatasetVersion;
 use crate::{
     client::{evaluate_response, BaseClient},
@@ -37,7 +38,7 @@ pub async fn get_dataset_meta(
         }
     } else {
         match id {
-            Identifier::PersistentId(_) => "api/datasets/:persistentId".to_string(),
+            Identifier::PersistentId(_) => format!("api/datasets/:persistentId"),
             Identifier::Id(_) => format!("api/datasets/{id}"),
         }
     };

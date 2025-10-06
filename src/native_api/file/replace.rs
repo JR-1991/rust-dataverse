@@ -37,7 +37,7 @@ pub async fn replace_file(
     callbacks: Option<Vec<CallbackFun>>,
 ) -> Result<Response<UploadResponse>, String> {
     // Endpoint metadata
-    let path = format!("api/files/{id}/replace");
+    let path = format!("api/files/{}/replace", id);
 
     // Build hash maps and body for the request
     let file: HashMap<String, UploadFile> = HashMap::from([("file".to_string(), file.into())]);

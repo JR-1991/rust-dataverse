@@ -41,7 +41,7 @@ pub async fn upload_directory(
     // Endpoint metadata
     let path = match id {
         Identifier::PersistentId(_) => "api/datasets/:persistentId/add".to_string(),
-        Identifier::Id(id) => format!("api/datasets/{id}/add"),
+        Identifier::Id(id) => format!("api/datasets/{}/add", id),
     };
 
     // Prepare zipping channel

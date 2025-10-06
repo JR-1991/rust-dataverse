@@ -86,7 +86,7 @@ impl Matcher for FileSubCommand {
                 evaluate_and_print_response(response);
             }
             FileSubCommand::Meta { id } => {
-                println!("Getting file metadata for {id:?}");
+                println!("Getting file metadata for {:?}", id);
                 let response = runtime.block_on(metadata::get_file_meta(client, &id));
                 evaluate_and_print_response(response);
             }
@@ -108,7 +108,7 @@ impl Matcher for FileSubCommand {
                         Status::OK,
                     ),
                     Err(e) => Response::from_message(
-                        Message::PlainMessage(format!("Error downloading file: {e}")),
+                        Message::PlainMessage(format!("Error downloading file: {}", e)),
                         Status::ERROR,
                     ),
                 };

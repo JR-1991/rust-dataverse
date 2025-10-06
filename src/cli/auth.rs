@@ -57,7 +57,7 @@ impl Matcher for AuthSubCommand {
 
                 match response {
                     Ok(_) => println!("Profile set successfully"),
-                    Err(e) => println!("Failed to set profile: {e}"),
+                    Err(e) => println!("Failed to set profile: {}", e),
                 }
             }
         }
@@ -170,7 +170,7 @@ impl AuthProfile {
     /// # Implementation Details
     /// Uses "--" as a delimiter between URL and token since URLs cannot contain "--"
     fn combine_url_and_token(url: &str, token: &str) -> String {
-        format!("{url}--{token}")
+        format!("{}--{}", url, token)
     }
 
     /// Splits a combined URL and token string back into separate components.

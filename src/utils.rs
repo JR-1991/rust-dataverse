@@ -29,7 +29,7 @@ pub async fn get_dataset_id(
     let response = get_dataset_meta(client, pid, &version).await?;
     match response.data {
         Some(data) => Ok(data.dataset_id.unwrap()),
-        None => Err(format!("Dataset {pid} not found")),
+        None => Err(format!("Dataset {} not found", pid)),
     }
 }
 

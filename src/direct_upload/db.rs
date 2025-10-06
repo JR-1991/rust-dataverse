@@ -31,7 +31,7 @@ pub(crate) async fn create_database(
         // Create the database
         match Sqlite::create_database(&db_path).await {
             Ok(_) => println!("Create db success"),
-            Err(error) => panic!("error: {error}"),
+            Err(error) => panic!("error: {}", error),
         }
     }
 

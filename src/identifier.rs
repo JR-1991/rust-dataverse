@@ -35,8 +35,8 @@ impl FromStr for Identifier {
 impl Display for Identifier {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self { 
-            Self::Id(id) => write!(f, "{id}"),
-            Self::PersistentId(pid) => write!(f, "{pid}"),
+            Self::Id(id) => write!(f, "{}", id),
+            Self::PersistentId(pid) => write!(f, "{}", pid),
         }
     }
 }

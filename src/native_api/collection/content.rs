@@ -47,7 +47,7 @@ pub async fn get_content(
     alias: &str,
 ) -> Result<Response<Vec<CollectionContent>>, String> {
     // Endpoint metadata
-    let url = format!("api/dataverses/{alias}/contents");
+    let url = format!("api/dataverses/{}/contents", alias);
 
     // Send request
     let context = RequestType::Plain;

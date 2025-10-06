@@ -64,13 +64,12 @@ impl Matcher for InfoSubCommand {
                             for (key, exporter) in exporters.iter() {
                                 println!("  - {}: {}", key.bold().blue(), exporter.display_name);
                             }
-                            let instructions = EXPORTERS_INSTRUCTIONS.to_string();
-                            println!("{instructions}");
+                            println!("{}", EXPORTERS_INSTRUCTIONS.to_string());
                         } else {
                             eprintln!("Error: {}", response.message.unwrap());
                         }
                     }
-                    Err(e) => eprintln!("Error: {e:?}"),
+                    Err(e) => eprintln!("Error: {:?}", e),
                 }
             }
         };

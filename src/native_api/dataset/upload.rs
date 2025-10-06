@@ -57,7 +57,7 @@ pub async fn upload_file_to_dataset(
     // Endpoint metadata
     let path = match id {
         Identifier::PersistentId(_) => "api/datasets/:persistentId/add".to_string(),
-        Identifier::Id(id) => format!("api/datasets/{id}/add"),
+        Identifier::Id(id) => format!("api/datasets/{}/add", id),
     };
 
     // Build hash maps for the request
@@ -197,7 +197,7 @@ pub async fn file_exists_at_dataset(
 
     let dataset = dataset_response
         .data
-        .ok_or(format!("Dataset '{id}' not found"))?;
+        .ok_or(format!("Dataset '{}' not found", id))?;
 
     for file in dataset.files {
         let label = file.label.ok_or("No label found")?;
