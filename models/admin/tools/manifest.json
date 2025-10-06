@@ -1,0 +1,125 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExternalToolManifest",
+  "type": "object",
+  "properties": {
+    "displayName": {
+      "type": "string",
+      "description": "The name of the tool in the Dataverse installation web interface"
+    },
+    "description": {
+      "type": "string",
+      "description": "The description of the tool, which appears in a popup (for configure tools only). HTML is supported"
+    },
+    "toolName": {
+      "type": "string",
+      "description": "A name used to differentiate between external tools and for localization in the Dataverse installation web interface"
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["file", "dataset"],
+      "description": "Whether the external tool appears and operates at the file level or the dataset level"
+    },
+    "types": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["explore", "preview", "query", "configure"]
+      },
+      "description": "Whether the external tool is an explore tool, a preview tool, a query tool, a configure tool or any combination of these"
+    },
+    "toolUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "The base URL of the tool before query parameters are added"
+    },
+    "contentType": {
+      "type": "string",
+      "description": "File level tools operate on a specific file type (content type or MIME type such as 'application/pdf'). Dataset level tools do not use contentType"
+    },
+    "httpMethod": {
+      "type": "string",
+      "enum": ["GET", "POST"],
+      "description": "Either GET or POST"
+    },
+    "toolParameters": {
+      "type": "object",
+      "properties": {
+        "queryParameters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "patternProperties": {
+              "^[a-zA-Z][a-zA-Z0-9_]*$": {
+                "type": "string",
+                "pattern": "^\\{(siteUrl|fileId|filePid|apiToken|datasetId|datasetPid|datasetVersion|localeCode)\\}$"
+              }
+            },
+            "additionalProperties": false,
+            "minProperties": 1,
+            "maxProperties": 1
+          },
+          "description": "Key/value combinations that can be appended to the toolUrl using reserved words for substitution"
+        }
+      },
+      "additionalProperties": false
+    },
+    "allowedApiCalls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A name the tool will use to identify this callback URL"
+          },
+          "httpMethod": {
+            "type": "string",
+            "enum": ["GET", "POST", "PUT", "DELETE"],
+            "description": "Which HTTP method the specified callback uses"
+          },
+          "urlTemplate": {
+            "type": "string",
+            "description": "The relative URL for the callback using reserved words to indicate where values should be dynamically substituted"
+          },
+          "timeOut": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "For non-public datasets and datafiles, how many minutes the signed URLs given to the tool should be valid for"
+          }
+        },
+        "required": ["name", "httpMethod", "urlTemplate"],
+        "additionalProperties": false
+      },
+      "description": "An array of objects defining callbacks the tool is allowed to make to the Dataverse API"
+    },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "auxFilesExist": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "formatTag": {
+                "type": "string",
+                "description": "The format tag of the required auxiliary file"
+              },
+              "formatVersion": {
+                "type": "string",
+                "description": "The format version of the required auxiliary file"
+              }
+            },
+            "required": ["formatTag", "formatVersion"],
+            "additionalProperties": false
+          },
+          "description": "An array containing formatTag and formatVersion pairs for each auxiliary file that your tool needs to download to function properly"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Resources your tool needs to function. Currently, requirements only apply to preview tools"
+    }
+  },
+  "required": ["displayName", "scope", "toolUrl"],
+  "additionalProperties": false
+}

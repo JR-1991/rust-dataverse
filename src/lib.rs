@@ -98,6 +98,15 @@ pub mod native_api {
             /// Storage management
             pub mod storage;
         }
+        /// Tool administration
+        pub mod tools {
+            /// Tool addition
+            pub mod add;
+            /// List tools
+            pub mod list;
+            /// Tool manifest
+            pub(crate) mod manifest;
+        }
     }
 
     /// Collection operations

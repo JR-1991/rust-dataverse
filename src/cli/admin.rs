@@ -5,11 +5,14 @@
 //! - Setting/getting storage configuration for collections
 //! - Resetting storage settings
 
+use std::path::PathBuf;
+
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
 
 use crate::client::BaseClient;
 use crate::native_api::admin::collection::storage;
+use crate::native_api::admin::tools;
 
 use super::base::{evaluate_and_print_response, Matcher};
 
@@ -47,6 +50,18 @@ pub enum AdminSubCommand {
         #[structopt(help = "Alias of the collection to reset the storage driver for")]
         alias: String,
     },
+
+    /// Register an external tool
+    #[structopt(about = "Registers an external tool with the Dataverse instance")]
+    AddExternalTool {
+        /// The tool manifest to register
+        #[structopt(help = "Path to the tool manifest file")]
+        manifest: PathBuf,
+    },
+
+    /// List all external tools
+    #[structopt(about = "Lists all external tools registered with the Dataverse instance")]
+    ListExternalTools {},
 }
 
 impl Matcher for AdminSubCommand {
@@ -88,6 +103,18 @@ impl Matcher for AdminSubCommand {
             AdminSubCommand::ResetStorage { alias } => {
                 let response =
                     runtime.block_on(storage::reset_collection_storage_driver(client, &alias));
+                evaluate_and_print_response(response);
+            }
+            AdminSubCommand::AddExternalTool { manifest } => {
+                let manifest_content = std::fs::read_to_string(manifest).unwrap();
+                let manifest: tools::manifest::ExternalToolManifest =
+                    serde_json::from_str(&manifest_content).unwrap();
+                let response =
+                    runtime.block_on(tools::add::register_external_tool(client, manifest));
+                evaluate_and_print_response(response);
+            }
+            AdminSubCommand::ListExternalTools {} => {
+                let response = runtime.block_on(tools::list::list_external_tools(client));
                 evaluate_and_print_response(response);
             }
         }
