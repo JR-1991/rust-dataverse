@@ -1,8 +1,7 @@
-use regress;
 use typify::import_types;
 
 use crate::{
-    client::{BaseClient, evaluate_response},
+    client::{evaluate_response, BaseClient},
     request::RequestType,
     response::Response,
 };
@@ -35,10 +34,10 @@ mod tests {
     use super::*;
 
     lazy_static! {
-        static ref BASE_URL: String = std::env::var("BASE_URL")
-            .expect("BASE_URL must be set for tests");
-        static ref DV_VERSION: String = std::env::var("DV_VERSION")
-            .expect("DV_VERSION must be set for tests");
+        static ref BASE_URL: String =
+            std::env::var("BASE_URL").expect("BASE_URL must be set for tests");
+        static ref DV_VERSION: String =
+            std::env::var("DV_VERSION").expect("DV_VERSION must be set for tests");
     }
 
     #[tokio::test]
@@ -47,14 +46,11 @@ mod tests {
         let client = BaseClient::new(&BASE_URL, None).unwrap();
 
         // Act
-        let response = get_version(&client)
-            .await
-            .expect("Could not get version");
+        let response = get_version(&client).await.expect("Could not get version");
+        let response = response.data.expect("No version data returned");
+        let version = response.version;
 
         // Assert
-        assert_eq!(
-            response.data.unwrap().version.to_string(),
-            *VersionResponseVersion(DV_VERSION.to_string())
-        );
+        assert_eq!(version, DV_VERSION.to_string());
     }
 }
