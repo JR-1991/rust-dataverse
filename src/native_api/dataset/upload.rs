@@ -19,11 +19,7 @@ use crate::{
     response::Response,
 };
 
-import_types!(
-    schema = "models/file/filemeta.json",
-    struct_builder = true,
-    derives = [Default],
-);
+import_types!(schema = "models/file/filemeta.json", struct_builder = true);
 
 /// Uploads a file to a dataset identified by either a persistent identifier (PID) or a numeric ID.
 ///
