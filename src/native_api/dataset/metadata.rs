@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::datasetversion::determine_version;
 use crate::prelude::DatasetVersion;
 use crate::{
     client::{evaluate_response, BaseClient},

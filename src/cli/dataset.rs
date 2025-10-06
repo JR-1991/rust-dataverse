@@ -12,7 +12,6 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use chrono::ParseResult;
 use colored_json::Paint;
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
