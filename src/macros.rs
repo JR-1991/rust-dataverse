@@ -54,7 +54,7 @@ mod tests {
         client::BaseClient,
         prelude::{
             dataset::{
-                get_dataset_meta, get_locks, locks::LockType, remove_lock, set_lock,
+                get_locks, list_dataset_files, locks::LockType, remove_lock, set_lock,
                 upload_file_to_dataset,
             },
             Identifier,
@@ -120,16 +120,15 @@ mod tests {
             panic!("Lock request failed");
         }
 
-        let metadata = get_dataset_meta(&client, &Identifier::PersistentId(pid.clone()), &None)
+        let files = list_dataset_files(&client, &Identifier::PersistentId(pid.clone()), &None)
             .await
-            .expect("Failed to get metadata");
+            .expect("Failed to get files")
+            .data
+            .unwrap();
 
-        assert!(metadata.status.is_ok());
-        if let Some(metadata) = metadata.data {
-            assert!(!metadata.files.is_empty());
-        } else {
-            panic!("Metadata request failed");
-        }
+        let files = files.0.values().collect::<Vec<_>>();
+
+        assert!(!files.is_empty());
     }
 
     #[tokio::test]
