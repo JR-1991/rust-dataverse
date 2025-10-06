@@ -251,7 +251,7 @@ impl Hasher for MD5Hasher {
 
     fn compute(&self) -> Result<String, Box<dyn Error + '_>> {
         let hasher = self.0.lock()?.clone();
-        Ok(format!("{:x}", hasher.compute()))
+        Ok(format!("{:x}", hasher.finalize()))
     }
 
     fn to_callback(&self) -> CallbackFun {
