@@ -54,10 +54,24 @@ pub async fn list_dataset_files(
         ));
     }
 
-    let files = response
+    let dataset = response
         .data
-        .ok_or("No data found in dataset metadata".to_string())?
-        .files;
+        .ok_or("No data found in dataset metadata".to_string())?;
+
+    let files = match dataset.latest_version {
+        Some(latest_version) => {
+            if latest_version.files.is_empty() {
+                return Err("No files found in dataset".to_string());
+            }
+            latest_version.files
+        }
+        None => {
+            if dataset.files.is_empty() {
+                return Err("No files found in dataset".to_string());
+            }
+            dataset.files
+        }
+    };
 
     let files = files
         .iter()
