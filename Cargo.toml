@@ -6,7 +6,7 @@ repository = "https://github.com/gdcc/rust-dataverse"
 homepage = "https://github.com/gdcc/rust-dataverse"
 license = "MIT"
 authors = ["Jan Range <jan.range@simtech.uni-stuttgart.de>"]
-description = "A Rust library for interacting with the Dataverse API."
+description = "Rust library and CLI for interacting with the Dataverse API."
 documentation = "https://guides.dataverse.org/en/latest/"
 
 [lib]
