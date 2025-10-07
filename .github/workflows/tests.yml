@@ -6,13 +6,17 @@ env:
 
 jobs:
   custom_test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     name: Dataverse Tests
     env:
       PORT: 8080
     steps:
-      - name: "Checkout"
-        uses: "actions/checkout@v4"
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
       - name: Run Dataverse Action
         id: dataverse
         uses: gdcc/dataverse-action@main
