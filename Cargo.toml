@@ -1,8 +1,9 @@
 [package]
 name = "rust-dataverse"
-version = "0.1.1"
+version = "0.0.0"
 edition = "2021"
 repository = "https://github.com/gdcc/rust-dataverse"
+homepage = "https://github.com/gdcc/rust-dataverse"
 license = "MIT"
 authors = ["Jan Range <jan.range@simtech.uni-stuttgart.de>"]
 description = "A Rust library for interacting with the Dataverse API."
