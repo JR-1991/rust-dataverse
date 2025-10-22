@@ -9,8 +9,8 @@ jobs:
     runs-on: 'ubuntu-22.04'
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
-      tag: ${{ !github.event.pull_request && github.ref_name || '' }}
-      tag-flag: ${{ !github.event.pull_request && format('--tag={0}', github.ref_name) || '' }}
+      tag: ''
+      tag-flag: ''
       publishing: ${{ !github.event.pull_request }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -20,8 +20,6 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: Install dist
-        # we specify bash to get pipefail; it guards against the `curl` command
-        # failing. otherwise `sh` won't catch that `curl` returned non-0
         shell: bash
         run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.30.0/cargo-dist-installer.sh | sh"
       - name: Cache dist
@@ -31,7 +29,7 @@ jobs:
           path: ~/.cargo/bin/dist
       - id: plan
         run: |
-          dist ${{ (!github.event.pull_request && format('host --steps=create --tag={0}', github.ref_name)) || 'plan' }} --output-format=json > plan-dist-manifest.json
+          dist plan --output-format=json > plan-dist-manifest.json
           echo "dist ran successfully"
           cat plan-dist-manifest.json
           echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
@@ -44,7 +42,6 @@ jobs:
   # Build and packages all the platform-specific things
   build-local-artifacts:
     name: build-local-artifacts (${{ join(matrix.targets, ', ') }})
-    # Let the initial task tell us to not run (currently very blunt)
     needs:
       - plan
     if: ${{ fromJson(needs.plan.outputs.val).ci.github.artifacts_matrix.include != null && (needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload') }}
@@ -85,7 +82,7 @@ jobs:
       - name: Build artifacts
         run: |
           # Actually do builds and make zips and whatnot
-          dist build ${{ needs.plan.outputs.tag-flag }} --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
+          dist build --print=linkage --output-format=json ${{ matrix.dist_args }} > dist-manifest.json
           echo "dist ran successfully"
       - id: cargo-dist
         name: Post-build
